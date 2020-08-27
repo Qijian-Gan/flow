@@ -139,29 +139,32 @@ INT_GET_DURATION_PHASE = 0x26
 #: get replication name
 INT_GET_REPLICATION_NAME = 0x27
 
+#: get green phase utilization
+INT_GET_GREEN_UTIL = 0x28
+
 ###############################################################################
 #                           Detector Commands                            #
 ###############################################################################
 
 #: get detector ids on an edge
-DET_GET_IDS_ON_EDGE = 0x28
+DET_GET_IDS_ON_EDGE = 0x29
 
 #: get flow and occupancy for a detector
-DET_GET_COUNT_AND_OCCUPANCY = 0x29
+DET_GET_COUNT_AND_OCCUPANCY = 0x2A
 
 #: set statistical interval for the scenairo
-DET_SET_STAT_INTERVAL = 0x2A
+DET_SET_STAT_INTERVAL = 0x2B
 
 #: set detection interval for the scenairo
-DET_SET_DETECTION_INTERVAL = 0x2B
+DET_SET_DETECTION_INTERVAL = 0x2C
 
 #: get number detector lanes
-DET_GET_DETECTOR_LANES = 0x2C
+DET_GET_DETECTOR_LANES = 0x2D
 
 ###############################################################################
 #                               Network Commands                              #
 ###############################################################################
 
 #: get the edge name in aimsun
-GET_EDGE_NAME = 0x2D
+GET_EDGE_NAME = 0x2E
 

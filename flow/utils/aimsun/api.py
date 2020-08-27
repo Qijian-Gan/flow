@@ -987,3 +987,25 @@ class FlowAimsunAPI(object):
                            in_format='i',
                            values=(seed,),
                            out_format=None)
+
+    def get_green_util(self, node_id): #gutil
+        """
+        Gets the occurence and total time of each phase in a node
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        dict
+            dict of phases and total time
+        dict
+            dict of phases and occurence
+        """
+        gUtil_list = self._send_command(ac.INT_GET_GREEN_UTIL,
+                                    in_format='i',
+                                    values=(node_id,),        
+                                    out_format='str')
+        #return g_Util
+        return [float(g_Util) for g_Util in gUtil_list.split(',')]

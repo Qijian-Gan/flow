@@ -300,3 +300,15 @@ class AimsunKernelTrafficLight(KernelTrafficLight):
         """
 
         return self.kernel_api.set_replication_seed(seed)
+
+    def get_green_util(self,node_id):
+        """
+        Gets the green time utilization at a specific node
+
+        Parameters
+        ----------
+        node_id: int
+            junction id
+        """
+
+        return self.kernel_api.get_green_util(node_id)

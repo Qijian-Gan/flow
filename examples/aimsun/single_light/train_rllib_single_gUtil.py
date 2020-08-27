@@ -8,7 +8,7 @@ from flow.utils.rllib import FlowParamsEncoder
 from flow.utils.registry import make_create_env
 from flow.core.params import AimsunParams, NetParams, VehicleParams, EnvParams, InitialConfig
 
-from single_light_nqueue import CoordinatedNetwork, SingleLightEnv, ADDITIONAL_ENV_PARAMS
+from single_light_gUtil import CoordinatedNetwork, SingleLightEnv, ADDITIONAL_ENV_PARAMS
 
 try:
     from ray.rllib.agents.agent import get_agent_class
@@ -24,13 +24,13 @@ DETECTOR_STEP = 900  # copy to run.py #Cj: every 15 minutes
 TIME_HORIZON = 3600*4 - DETECTOR_STEP  # 14400
 HORIZON = int(TIME_HORIZON//SIM_STEP)  # 18000
 
-RLLIB_N_CPUS = 4
+RLLIB_N_CPUS = 8
 RLLIB_HORIZON = int(TIME_HORIZON//DETECTOR_STEP)  #  16
 
 RLLIB_N_ROLLOUTS = 3  # copy to coordinated_lights.py
 RLLIB_TRAINING_ITERATIONS = 1000000
 
-net_params = NetParams(template=os.path.abspath("scenario_one_hourK.ang"))
+net_params = NetParams(template=os.path.abspath("scenario_one_hour.ang"))
 initial_config = InitialConfig()
 vehicles = VehicleParams()
 env_params = EnvParams(horizon=HORIZON,
@@ -46,7 +46,7 @@ sim_params = AimsunParams(sim_step=SIM_STEP,
 
 
 flow_params = dict(
-    exp_tag="single_light_queue",
+    exp_tag="single_light_gUtil_queue",
     env_name=SingleLightEnv,
     network=CoordinatedNetwork,
     simulator='aimsun',
@@ -85,7 +85,7 @@ def setup_exps(version=0):
     config["num_sgd_iter"] = 10
     config['clip_actions'] = False  # (ev) temporary ray bug
     config["horizon"] = RLLIB_HORIZON  # not same as env horizon.
-    config["vf_loss_coeff"] = 1e-8 
+    config["vf_loss_coeff"] = 1
     config["vf_clip_param"] = 600
     config["lr"] = 5e-4 #vary
 
