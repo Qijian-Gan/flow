@@ -303,7 +303,7 @@ class SingleLightEnv(Env):
             self.past_cumul_queue[section_id] = current_cumul_queue
 
             r_queue += queue
-            print(queue)
+            #print(queue)
         
         reward = -((a0*r_queue) + (a1*gUtil))
         print(r_queue, gUtil)
