@@ -211,3 +211,7 @@ def get_detector_ids(edge_id):
             except ValueError:
                 pass
     return detector_list
+
+def get_ave_app_delay(node_id):
+    ave_app_delay = aapi.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+    return ave_app_delay

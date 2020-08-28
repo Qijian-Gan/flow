@@ -1009,3 +1009,23 @@ class FlowAimsunAPI(object):
                                     out_format='str')
         #return g_Util
         return [float(g_Util) for g_Util in gUtil_list.split(',')]
+
+    def get_ave_app_delay(self, node_id):
+        """
+        Gets the node's average approach delay
+
+        Parameters
+        ----------
+        node id: int
+            the id of the node
+
+        Returns
+        -------
+        float
+            average approach delay at the node
+        """
+        ave_app_delay, = self._send_command(ac.INT_GET_AVE_APP_DELAY,
+                                             in_format='i',
+                                             values=(node_id,),
+                                             out_format='f')
+        return ave_app_delay

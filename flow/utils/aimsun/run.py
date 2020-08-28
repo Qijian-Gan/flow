@@ -636,6 +636,14 @@ def threaded_client(conn, **kwargs):
 
                 send_message(conn, in_format='str', values=(output,))
 
+            elif data == ac.INT_GET_AVE_APP_DELAY:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
+
+                ave_app_delay = cp.get_ave_app_delay(node_id)
+
+                send_message(conn, in_format='f', values=(ave_app_delay,))
+
             elif data == ac.INT_GET_CUME_QUEUE_LENGTH:
                 send_message(conn, in_format='i', values=(0,))
                 section_id, = retrieve_message(conn, 'i')
