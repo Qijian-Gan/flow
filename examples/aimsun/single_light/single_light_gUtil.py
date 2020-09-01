@@ -157,7 +157,7 @@ class SingleLightEnv(Env):
                 print('initial phase: {} duration: {} max: {} min: {}'.format(phase, phase_duration, maxd, mind))
             self.rep_name, self.rep_seed = self.k.traffic_light.get_replication_name(node_id)
             self.cycle = self.k.traffic_light.get_cycle_length(self.node_id,self.control_id)
-            print('rep_name: {} cycle_length: {}'.format(self.rep_name,self.cycle))
+            print('rep_name: {}, seed: {}, cycle_length: {}'.format(self.rep_name,self.rep_seed, self.cycle))
         
         self.ignore_policy = False
 
