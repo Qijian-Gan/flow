@@ -155,7 +155,7 @@ class SingleLightEnv(Env):
                 #self.k.traffic_light.change_phase_duration(node_id, phase, phase_duration)
                 self.current_phase_timings.append(phase_duration)
                 print('initial phase: {} duration: {} max: {} min: {}'.format(phase, phase_duration, maxd, mind))
-            self.rep_name = self.k.traffic_light.get_replication_name(node_id)
+            self.rep_name, self.rep_seed = self.k.traffic_light.get_replication_name(node_id)
             self.cycle = self.k.traffic_light.get_cycle_length(self.node_id,self.control_id)
             print('rep_name: {} cycle_length: {}'.format(self.rep_name,self.cycle))
         
@@ -292,10 +292,10 @@ class SingleLightEnv(Env):
         util_per_phase = self.k.traffic_light.get_green_util(self.node_id)
         gUtil = sum(util_per_phase)
         a1 = 1
-        a0 = 17
+        a0 = 0.2
 
         ## map phases to section
-        #phase_section_dict = { ,[,],}
+        # phase_section_dict = { ,[,],}
         # queue length as reward
         for section_id in self.past_cumul_queue:
             current_cumul_queue = self.k.traffic_light.get_cumulative_queue_length(section_id)
@@ -305,11 +305,11 @@ class SingleLightEnv(Env):
             r_queue += queue
             #print(queue)
         
-        reward = -((a0*r_queue) + (a1*gUtil))
-        print(r_queue, gUtil)
+        new_reward = ((a0*r_queue) + (a1*gUtil))
+        reward = - ((new_reward ** 2)*100)
         ## note: self.k.simulation.time is flow time
         ##  f'{slow_time} \t {aimsun_time}
-        print(f'{self.k.simulation.time:.0f}','\t', f'{reward:.4f}', '\t', self.control_id, '\t',
+        print(f'{self.k.simulation.time:.0f}','\t', f'{reward:.4f}', '\t',
               self.current_phase_timings[0],'\t', self.current_phase_timings[1],'\t', self.current_phase_timings[2],'\t', 
               self.current_phase_timings[3],'\t', self.current_phase_timings[4],'\t', self.current_phase_timings[5],'\t', 
               self.current_phase_timings[6],'\t', self.current_phase_timings[7],'\t', sum(self.current_phase_timings[4:])+18, self.sum_barrier)
@@ -350,9 +350,9 @@ class SingleLightEnv(Env):
         infos = {}
 
         self.control_id, self.num_rings = self.k.traffic_light.get_control_ids(self.node_id)
-        self.rep_name = self.k.traffic_light.get_replication_name(self.node_id)
+        self.rep_name,_ = self.k.traffic_light.get_replication_name(self.node_id)
         self.cycle = self.k.traffic_light.get_cycle_length(self.node_id, self.control_id)
-        print(self.k.simulation.time, self.rep_name, self.cycle)
+        #print(self.k.simulation.time, self.rep_name, self.cycle)
 
         # compute the reward
         reward = self.compute_reward(rl_actions)
@@ -367,6 +367,8 @@ class SingleLightEnv(Env):
         # reset the step counter
         self.step_counter = 0
 
+        rep_name,rep_seed = self.k.traffic_light.get_replication_name(self.node_id)
+
         if self.episode_counter:
             self.k.simulation.reset_simulation()
 
@@ -374,6 +376,7 @@ class SingleLightEnv(Env):
 
             print('-----------------------')
             print(f'Episode {RLLIB_N_ROLLOUTS if not episode else episode} of {RLLIB_N_ROLLOUTS} complete')
+            print(f'Replication Name : Seed: {rep_name} : {rep_seed}')
             print('Resetting simulation')
             print('-----------------------')
 

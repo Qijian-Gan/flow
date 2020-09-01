@@ -719,12 +719,12 @@ class FlowAimsunAPI(object):
         int
             the offset of the intersection
         """
-        rep_name, = self._send_command(ac.INT_GET_REPLICATION_NAME,
+        rep_name,rep_seed, = self._send_command(ac.INT_GET_REPLICATION_NAME,
                                      in_format='i',
                                      values=(node_id,),
-                                     out_format='i')
+                                     out_format='i i')
 
-        return rep_name
+        return rep_name, rep_seed
 
     def get_duration_phase(self, node_id, phase):  # cj
         """

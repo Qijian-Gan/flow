@@ -568,9 +568,9 @@ def threaded_client(conn, **kwargs):
                 send_message(conn, in_format='i', values=(0,))
                 node_id, = retrieve_message(conn, 'i')
 
-                rep_name = cp.get_replication_name(node_id)
+                rep_name, rep_seed = cp.get_replication_name(node_id)
 
-                send_message(conn, in_format='i', values=(rep_name,))
+                send_message(conn, in_format='i i', values=(rep_name,rep_seed,))
 
             elif data == ac.INT_GET_DURATION_PHASE:  # cj
                 send_message(conn, in_format='i', values=(0,))

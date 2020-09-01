@@ -25,7 +25,7 @@ TIME_HORIZON = 3600*4 - DETECTOR_STEP  # 14400
 HORIZON = int(TIME_HORIZON//SIM_STEP)  # 18000
 
 RLLIB_N_CPUS = 8
-RLLIB_HORIZON = int(TIME_HORIZON//DETECTOR_STEP)  #  16
+RLLIB_HORIZON = int(TIME_HORIZON//DETECTOR_STEP)  # 16
 
 RLLIB_N_ROLLOUTS = 3  # copy to coordinated_lights.py
 RLLIB_TRAINING_ITERATIONS = 1000000
@@ -75,8 +75,8 @@ def setup_exps(version=0):
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config["num_workers"] = RLLIB_N_CPUS
-    config["sgd_minibatch_size"] = RLLIB_HORIZON
-    config["train_batch_size"] = RLLIB_HORIZON * RLLIB_N_ROLLOUTS
+    config["sgd_minibatch_size"] = RLLIB_HORIZON #16 
+    config["train_batch_size"] = RLLIB_HORIZON * RLLIB_N_ROLLOUTS # 16*3
     config["sample_batch_size"] = RLLIB_HORIZON * RLLIB_N_ROLLOUTS
     config["model"].update({"fcnet_hiddens": [64, 64, 64]})
     config["use_gae"] = True
@@ -87,7 +87,8 @@ def setup_exps(version=0):
     config["horizon"] = RLLIB_HORIZON  # not same as env horizon.
     config["vf_loss_coeff"] = 1
     config["vf_clip_param"] = 600
-    config["lr"] = 5e-4 #vary
+    #config["lr"] = 5e-4 #vary, lr
+    config["lr_schedule"] = [[0, 5e-3],[20000, 5e-4]]
 
     # save the flow params for replay
     flow_json = json.dumps(
@@ -121,7 +122,8 @@ if __name__ == "__main__":
             },
             #"restore": '/home/damian/ray_results/single_light_queue/PPO_SingleLightEnv-v0_ab65bf70_2020-08-01_04-58-41d_bnsz2z/checkpoint_96/checkpoint-96',
             # "local_dir": os.path.abspath("./ray_results"),
-            "keep_checkpoints_num": 7
+            "keep_checkpoints_num": 7,
+            "checkpoint_score_attr":"episode_reward_mean"
         }
     },
         resume=False)

@@ -14,7 +14,12 @@ def get_intersection_offset(node_id):
 def get_replication_name(node_id): #cj28
     node_id = node_id
     rep_name = aapi.ANGConnGetReplicationId()
-    return rep_name
+
+    replications = model.getCatalog().getObjectsByType(model.getType("GKReplication"))
+    for replication in replications.values():
+        rep_seed = replication.getRandomSeed()
+
+    return rep_name, rep_seed
 
 def get_cumulative_queue_length(section_id):
     catalog = model.getCatalog()
