@@ -8,7 +8,7 @@ from flow.utils.rllib import FlowParamsEncoder
 from flow.utils.registry import make_create_env
 from flow.core.params import AimsunParams, NetParams, VehicleParams, EnvParams, InitialConfig
 
-from single_light_gUtil_v2 import CoordinatedNetwork, SingleLightEnv, ADDITIONAL_ENV_PARAMS
+from single_light_gUtil_v2_3370 import CoordinatedNetwork, SingleLightEnv, ADDITIONAL_ENV_PARAMS
 
 try:
     from ray.rllib.agents.agent import get_agent_class
@@ -30,7 +30,7 @@ RLLIB_HORIZON = int(TIME_HORIZON//DETECTOR_STEP)  # 16
 RLLIB_N_ROLLOUTS = 3  # copy to coordinated_lights.py
 RLLIB_TRAINING_ITERATIONS = 1000000
 
-net_params = NetParams(template=os.path.abspath("scenario_one_hour.ang"))
+net_params = NetParams(template=os.path.abspath("scenario_one_hour_3370.ang"))
 initial_config = InitialConfig()
 vehicles = VehicleParams()
 env_params = EnvParams(horizon=HORIZON,
@@ -46,7 +46,7 @@ sim_params = AimsunParams(sim_step=SIM_STEP,
 
 
 flow_params = dict(
-    exp_tag="single_light_gUtil_v2",
+    exp_tag="single_light_gUtil_v2_3370",
     env_name=SingleLightEnv,
     network=CoordinatedNetwork,
     simulator='aimsun',
