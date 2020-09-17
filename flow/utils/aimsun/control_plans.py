@@ -199,9 +199,9 @@ def get_detector_ids(edge_id):
         if detector.IdSection == edge_id:
             edge_aimsun = catalog.find(detector.IdSection)
 
-            if (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 4:
+            if (edge_aimsun.length2D() - detector.FinalPosition) < 6 and (detector.IdFirstLane == 3 or detector.IdFirstLane == 2): # 3or2 for 3370, 4 for 3369
                 kind = "left"
-            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 1:
+            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 0: #0 for 3370, 1 for 3369
                 kind = "right"
             elif (edge_aimsun.length2D() - detector.FinalPosition) < 6:
                 kind = "through"
