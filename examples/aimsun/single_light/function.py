@@ -1,196 +1,100 @@
-new_function.py
-def get_ids(node_id):
-    #returns number of rings and control_id
-    control_id = aapi.ECIGetNumberCurrentControl(node_id)
-    num_rings = aapi.ECIGetNbRingsJunction(control_id, node_id)
-
-    return control_id, num_rings
-
-    # returns control_id = int, num_rings = int
-
-def get_green_phases(node_id, ring_id, timeSta):
-    num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-    if ring_id > 0:
-        a = num_phases + 1
-        num_phases = num_phases*2
-            
-    return [phase for phase in range(a, num_phases+1)]
-
-    # returns phases = [1 2 3 4]
-
-def __init__(self):
-    self.phases = []
-    for node_id in target_nodes:
-        self.control_id, self.num_rings = self.k.traffic_light.get_ids(node_id)
-
-    for ring_id in range(num_rings):
-        phase_list = self.k.traffic_light.get_phases(node_id, ring_id)
-        self.phases.append(phase_list)
-
-    # phases = [[1 3 5 7], [9 11 13 15]]
-
-##### RL_ACTION #####
-def change_phase_duration(node_id, phase, duration, time, timeSta, acycle):
-    aapi.ECIChangeTimingPhase(node_id, phase, duration, timeSta)
-
-@property
-def action_space(self):
-    """See class definition."""
-    return Tuple(4 * (Discrete(120, ),)) #*fixed number (number of green phases per ring) [hardcoded]
-
-def _apply_rl_actions(self, rl_actions):
-    if self.ignore_policy:
-        print('self.ignore_policy is True')
-        return
-    actions = np.array(rl_actions).flatten()
-    for phase_list in self.phases:
-        for phase, action in zip(phase_list, actions):
-            if action:
-                self.k.traffic_light.change_phase_duration(phase, duration)
-    self.current_phase_timings = actions
-
-
-
-
-
-
-
-
-
-
-### What do i need: ###
-    control_id, ring_id
-
-def get_current_ids(node_id):
-    phases = []
-    control_id = aapi.ECIGetNumberCurrentControl(node_id) #Get control index
-    num_rings = aapi.ECIGetNbRingsJunction(control_id,node_id) #Get Number of rings
-    for ring_id in range(1,num_rings*2):
-        num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-    for phase in range(num_phases):
-        phases.append(phase)
-
-    return control_id, num_rings, phases
-
-def change_phase_timing(node_id, duration, cycle, time, timeSta, acycle):
-    control_id = aapi.ECIGetNumberCurrentControl(node_id) #Get control index
-    num_rings = aapi.ECIGetNbRingsJunction(control_id,node_id) #Get Number of rings
-    for ring_id in range(num_rings):
-        curr_phase = aapi.ECIGetCurrentPhaseInRing(node_id,ring_id)
-        num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-        if curr_phase == num_phases: ##can be changed in interval time? Should I disregard interval time? Should i just per 15mins? 
-            total_green = int(get_total_green(node_id, ring_id, timeSta))
-            #####
-            a = 1
-            if ring_id > 0:
-                a = num_phases + 1
-                num_phases = num_phases*2
-            for phase in range(a,num_phases+1):
-                if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 1:
-                    continue
-                else:
-                    #### can include that duration sum must be equal to total green
-                    #### max green and min green parameters
-                    aapi.ECIChangeTimingPhase(node_id, phase, duration, timeSta)
-            duration = get_total_green(node_id, ring_id, timeSta)
-            print('Ring ID: {}, Duration:{}'.format(ring_id,duration))
-    return 0
-
-def get_green_phases(node_id, ring_id, timeSta):
-    green_phases = []
-    a = 1
-    num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-    if ring_id > 0:
-        a = num_phases + 1
-        num_phases = num_phases*2
-    for phase in range(a,num_phases+1):
-        if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 1:
-            continue
-        else:
-            green_phases.append(phase)
-    return green_phases
-
-    # returns phases = [1 2 3 4]
-
-
-
-#####First Trial####
-
 import AAPI as aapi
-import numpy as np
+import PyANGKernel as gk
 
-def change_phase_timing(node_id, duration, cycle, time, timeSta, acycle):
-    control_id = aapi.ECIGetNumberCurrentControl(node_id) #Get control index
-    num_rings = aapi.ECIGetNbRingsJunction(control_id,node_id) #Get Number of rings
-    for ring_id in range(num_rings):
-        curr_phase = aapi.ECIGetCurrentPhaseInRing(node_id,ring_id)
-        num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-        if curr_phase == num_phases: ##can be changed in interval time? Should I disregard interval time? Should i just per 15mins? 
-            total_green = int(get_total_green(node_id, ring_id, timeSta))
-            #####
-            a = 1
-            if ring_id > 0:
-                a = num_phases + 1
-                num_phases = num_phases*2
-            for phase in range(a,num_phases+1):
-                if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 1:
-                    continue
-                else:
-                	#### can include that duration sum must be equal to total green
-                	#### max green and min green parameters
-                    aapi.ECIChangeTimingPhase(node_id, phase, duration, timeSta)
-            duration = get_total_green(node_id, ring_id, timeSta)
-            print('Ring ID: {}, Duration:{}'.format(ring_id,duration))
-    return 0
+model = gk.GKSystem.getSystem().getActiveModel()
+global edge_detector_dict
+edge_detector_dict = {}
+length_car = 5  # typical car length
 
-def get_total_green(node_id, ring_id, timeSta):
-    ## Format is set current control plan 
-    sum_interphase = 0
-    control_id = aapi.ECIGetNumberCurrentControl(node_id)
-    control_cycle = aapi.ECIGetControlCycleofJunction(control_id, node_id)
-    num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-    for phase in (range(1,num_phases + 1)):
-        if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 0:
-            continue
-        else:
-            duration = get_duration_phase(node_id, phase, timeSta)
-            sum_interphase += duration
- 
-    total_green = control_cycle - sum_interphase
-    return total_green
 
-def change_barrier_timing(node_id,timeSta):
-    # For Current Control Plan
-    control_id = aapi.ECIGetNumberCurrentControl(node_id) #Get control index
-    num_rings = aapi.ECIGetNbRingsJunction(control_id,node_id) #Get Number of rings
-    total_green = int(get_total_green(node_id, 0, timeSta))
-    for ring_id in range(num_rings):
-        num_phases = aapi.ECIGetNumberPhasesInRing(node_id, ring_id)
-        a = 1
-        if ring_id > 0:
-            a = num_phases + 1
-            num_phases = num_phases*2
-        for phase in range(a,num_phases+1):
-            if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 1:
-                continue
+def get_incoming_edges(node_id):
+    catalog = model.getCatalog()
+    node = catalog.find(node_id)
+    in_edges = node.getEntranceSections()
+
+    return [edge.getId() for edge in in_edges]
+
+
+def get_detector_ids(edge_id):
+    catalog = model.getCatalog()
+    detector_list = {"left": [], "right": [], "through": [], "advanced": []}
+    for i in range(aapi.AKIDetGetNumberDetectors()):
+        detector = aapi.AKIDetGetPropertiesDetector(i)
+        if detector.IdSection == edge_id:
+            edge_aimsun = catalog.find(detector.IdSection)
+            print(detector.Id, detector.IdFirstLane)
+
+            if (edge_aimsun.length2D() - detector.FinalPosition) < 6 and (detector.IdFirstLane == 3 or detector.IdFirstLane == 2):
+                kind = "left"
+            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 0:
+                kind = "right"
+            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6:
+                kind = "through"
             else:
-                aapi.ECIChangeTimingPhase(node_id, phase, duration, timeSta)
+                kind = "advanced"
+
+            detector_obj = catalog.find(detector.Id)
+            try:
+                # only those with numerical exernalIds are real
+                int(detector_obj.getExternalId())
+                detector_list[kind].append(detector.Id)
+            except ValueError:
+                pass
+    return detector_list
+
+
+def AAPILoad():
     return 0
 
- 
+
+def AAPIInit():
+    # print(get_detector_ids(24660))
+    # print(get_detector_ids(655))
+    print(get_detector_ids(461))
+    return 0
 
 
+def AAPIManage(time, timeSta, timeTrans, acycle):
+    return 0
 
 
+def AAPIPostManage(time, timeSta, timeTrans, acycle):
+    # print( "AAPIPostManage" )
+    return 0
 
 
+def AAPIFinish():
+    # print("AAPIFinish")
+    return 0
 
 
+def AAPIUnLoad():
+    return 0
 
 
+def AAPIPreRouteChoiceCalculation(time, timeSta):
+    return 0
 
 
+def AAPIEnterVehicle(idveh, idsection):
+    return 0
 
 
+def AAPIExitVehicle(idveh, idsection):
+    return 0
 
 
+def AAPIEnterPedestrian(idPedestrian, originCentroid):
+    return 0
+
+
+def AAPIExitPedestrian(idPedestrian, destinationCentroid):
+    return 0
+
+
+def AAPIEnterVehicleSection(idveh, idsection, atime):
+    return 0
+
+
+def AAPIExitVehicleSection(idveh, idsection, atime):
+    return 0

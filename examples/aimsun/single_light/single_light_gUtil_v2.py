@@ -104,7 +104,7 @@ class SingleLightEnv(Env):
     @property
     def action_space(self):
         """See class definition."""
-        return Tuple(5 * (Discrete(86,),)) #5 (probabilities)
+        return Tuple(((len(self.green_phases)/2) + 1) * (Discrete(86,),)) #5 (probabilities)
 
     @property
     def observation_space(self):

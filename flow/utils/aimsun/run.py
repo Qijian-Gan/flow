@@ -17,6 +17,9 @@ import flow.utils.aimsun.control_plans as cp  # noqa
 from PyANGKernel import *  # noqa
 import AAPI as aimsun_api  # noqa
 
+## Export files
+writeFlag = True
+
 model = GKSystem.getSystem().getActiveModel()
 PORT = int(model.getAuthor())
 entered_vehicles = []
@@ -24,31 +27,42 @@ exited_vehicles = []
 
 start_time = [0]*2
 ut_time = [0]*2
-starting_phases = [1,9]
+starting_phases = [1,7]
 time_consumed = {}
 occurence = {}
-green_phases = [1,3,5,7,9,11,13,15]
+green_phases = [1,3,5,7,9,11]
+node_id = 3370
+
+if writeFlag == True:
+    rep_name = aimsun_api.ANGConnGetReplicationId()
+    from aimsun_props import Export_Params
+    export_params = Export_Params(rep_name,node_id)
 
 time_consumed = dict.fromkeys(green_phases,0) # dictionary of phases {0:None, 1:none,...} Note: Only green phases
 occurence = dict.fromkeys(green_phases,0)
+
+def get_duration_phase(node_id, phase, timeSta):
+    normalDurationP = aimsun_api.doublep()
+    maxDurationP = aimsun_api.doublep()
+    minDurationP = aimsun_api.doublep()
+    aimsun_api.ECIGetDurationsPhase(node_id, phase, timeSta,
+                              normalDurationP, maxDurationP, minDurationP)
+    normalDuration = normalDurationP.value()
+    maxDuration = maxDurationP.value()
+    minDuration = minDurationP.value()
+
+    return normalDuration, maxDuration, minDuration
 
 def gUtil_at_interval(ttime, occurs, timeSta):
     action_duration = []
     delta = 1e-3
     phase_list =green_phases
     for phase in phase_list:
-        normalDurationP = aimsun_api.doublep()
-        maxDurationP = aimsun_api.doublep()
-        minDurationP = aimsun_api.doublep()
-        aimsun_api.ECIGetDurationsPhase(3344, phase, timeSta,
-                                normalDurationP, maxDurationP, minDurationP)
-        normalDuration = normalDurationP.value()
-        maxDuration = maxDurationP.value()
-        minDuration = minDurationP.value()
+        normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
         action_duration.append(normalDuration)
 
     generated_Duration = action_duration
-    control_id = aimsun_api.ECIGetNumberCurrentControl(3344)
+    control_id = aimsun_api.ECIGetNumberCurrentControl(node_id)
     # what i need is the time_consumed, occurence, generated_duration
     phase_util = []
     gp_ttime = list(ttime.values()) #list of total times
@@ -719,7 +733,7 @@ def AAPIInit():
 def AAPIManage(time, timeSta, timeTrans, acycle):
     """Execute commands before an Aimsun simulation step."""
     # Create a thread when data needs to be sent back to FLOW
-    time_consumed, occurence = get_green_time(3344, time, timeSta)
+    time_consumed, occurence = get_green_time(node_id, time, timeSta)
     global time_consumed, occurence
 
     delta = 0.8/2
@@ -753,6 +767,14 @@ def AAPIManage(time, timeSta, timeTrans, acycle):
 
 def AAPIPostManage(time, timeSta, timeTrans, acycle):
     """Execute commands after an Aimsun simulation step."""
+    if writeFlag == True:
+        if time % 900 == 0:
+            action_list = []
+            for phase in green_phases:
+                normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
+                action_list.append(normalDuration)
+            delay = aimsun_api.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+            export_params.export_delay_action(node_id, delay, action_list, time, timeSta)
     return 0
 
 

@@ -33,12 +33,14 @@ cp_am_list = []
 cp_nn_list = []
 cp_pm_list = []
 
+## another option is to store to dataframe first then convert to csv
+
 with open('{}.csv'.format('aimsun_params'), 'a') as csvFile:
-    fieldnames = ['node_id', 'num_rings', 'green_phases_list', 'cp_id_list',
-                  'cycle_list']  # cycle_plan differs per replication
+    fieldnames = ['rep_name', 'node_id', 'num_rings', 'green_phases_list', 'cp_id_list',
+                  'cycle_list', 'sum_interphase', 'maxd_1', 'maxd_2','maxd_3','maxd_p',
+                  'det_left','det_right','det_through','det_adv','det_lanes']  # cycle_plan differs per replication
     csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
     csv_writer.writeheader()
-
 
 def get_control_ids(node_id):
     control_id = aapi.ECIGetNumberCurrentControl(node_id)

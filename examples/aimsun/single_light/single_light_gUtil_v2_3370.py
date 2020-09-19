@@ -149,10 +149,10 @@ class SingleLightEnv(Env):
                 # Setting minimum green to 5
                 if new_phase1 < 5:
                     new_phase1 = 5
-                    new_phase2 = sum_barrier[j] - new_phase1
+                    new_phase2 = sum_barrier[0] - new_phase1
                 elif new_phase2 < 5:
                     new_phase2 = 5
-                    new_phase1 = sum_barrier[j] - new_phase2
+                    new_phase1 = sum_barrier[0] - new_phase2
                 phase_pair = [new_phase1, new_phase2]
                 actionf.append(phase_pair)
 

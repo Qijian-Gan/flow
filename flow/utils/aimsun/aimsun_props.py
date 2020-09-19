@@ -51,38 +51,27 @@ class Aimsun_Params:
 ## Insert function for detectors and for gUtil
 
 class Export_Params:
-    def __init__(self, output_csv, green_phases):
-        self.green_phases = green_phases
-        with open(output_csv,'a') as csvFile:
-            data = []
-            fieldnames = ['time', 'delay_time', '1', '3', '5', '7', '9', '11', '13', '15', 'cycle', 'barrier']
-            csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-            csv_writer.writerow({'time': current_time})
-            csv_writer.writeheader()
+    def __init__(self, rep_name, node_id):
+        self.rep_name = str(rep_name) + '_' + str(node_id) + '.csv'
+        self.fieldnames = ['time', 'delay_time','action']
+        with open(self.rep_name,'a') as csvFile:
+            csv_writer = csv.writer(csvFile)
+            csv_writer.writerow([node_id])
 
-    def export_delay_time(self,node_id, time, timeSta, timeTrans, acycle):
+    def export_delay_action(self, node_id, delay, action_list, time, timeSta):
         time = time
         timeSta = timeSta
-        ave_app_delay = aapi.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+        ave_app_delay = delay
+        data_list = [time,delay]
+        #data_list.append(time)
+        #data_list.append(delay)
+        
+        for action in action_list:
+            data_list.append(action)
 
-        if replication_name == 8050297:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay)})
-
-
-        elif replication_name == 8050315:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay)})
-
-
-        if replication_name == 8050322:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay)})
-
-        ##add phase_durations
+        with open(self.rep_name, 'a') as csvFile:
+            csv_writer = csv.writer(csvFile)
+            csv_writer.writerows([data_list,])
 
 ##test
 #print(get_green_phases(3344))
