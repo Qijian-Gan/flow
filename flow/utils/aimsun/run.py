@@ -18,7 +18,7 @@ from PyANGKernel import *  # noqa
 import AAPI as aimsun_api  # noqa
 from aimsun_props import Aimsun_Params, Export_Params
 
-ap = Aimsun_Params('/home/cjrsantos/flow/flow/utils/aimsun/aimsun_props.csv')
+ap = Aimsun_Params('/home/damian/flow/flow/utils/aimsun/aimsun_props.csv')
 ## Export files
 writeFlag = False
 

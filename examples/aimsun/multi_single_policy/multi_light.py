@@ -24,7 +24,7 @@ RLLIB_N_ROLLOUTS = 3  # copy from train_rllib.py
 np.random.seed(1234567890)
 
 # read csv of Node Parameters
-ap = Aimsun_Params('/home/cjrsantos/flow/flow/utils/aimsun/aimsun_props.csv')
+ap = Aimsun_Params('/home/damian/flow/flow/utils/aimsun/aimsun_props.csv')
 
 
 def rescale_phase_pair(array, NewMin, NewMax):
@@ -66,7 +66,7 @@ class MultiLightEnv(Env):
         self.edge_detector_dict = {}
         self.edges_with_detectors = {}
         self.past_cumul_queue = {}
-        self.current_phase_timings = []
+        self.current_phase_timings = np.zeros(int(len(self.target_nodes)))
         #ap_keys = dict.fromkeys(['control_id', 'num_rings', 'green_phases', 'cc_dict', 'sum_interphase', 'max_dict', 'max_p'])
         #self.aimsun_props = {dict.fromkeys(self.target_nodes, ap_keys)}
         self.aimsun_props = {}
