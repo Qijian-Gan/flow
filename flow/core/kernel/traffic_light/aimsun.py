@@ -313,14 +313,3 @@ class AimsunKernelTrafficLight(KernelTrafficLight):
 
         return self.kernel_api.get_green_util(node_id)
 
-    def get_ave_app_delay(self,node_id):
-        """
-        Gets the green time utilization at a specific node
-
-        Parameters
-        ----------
-        node_id: int
-            junction id
-        """
-
-        return self.kernel_api.get_ave_app_delay(node_id)

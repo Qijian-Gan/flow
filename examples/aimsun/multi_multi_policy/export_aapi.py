@@ -16,7 +16,8 @@ now = datetime.now()
 westbound_section = [506, 563, 24660, 568, 462]
 eastbound_section = [338, 400, 461, 24650, 450]
 sections = [22208, 568, 22211, 400]
-node_id = 3344
+green_phases = [1,3,5,7,9,11]
+node_id = 3370
 
 interval = 15*60
 #seed = np.random.randint(2e9)
@@ -24,13 +25,8 @@ interval = 15*60
 replication_name = aapi.ANGConnGetReplicationId()
 replication = model.getCatalog().find(8050315)
 current_time = now.strftime('%H-%M:%S')
+rep_name = str(replication_name) + '_nopolicy_' + str(node_id) + '.csv'
 
-with open('{}.csv'.format(replication_name), 'a') as csvFile:
-    data = []
-    fieldnames = ['time', 'delay_time', '1', '3', '5', '7', '9', '11', '13', '15', 'cycle', 'barrier']
-    csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-    csv_writer.writerow({'time': current_time})
-    csv_writer.writeheader()
 
 
 def get_delay_time(section_id):
@@ -131,11 +127,33 @@ def get_phase_duration_list(node_id, timeSta):
         if aapi.ECIIsAnInterPhase(node_id, phase, timeSta) == 1:
             continue
         else:
-            dur, _, _ = get_duration_phase(3344, phase, timeSta)
+            dur, _, _ = get_duration_phase(node_id, phase, timeSta)
             idur = int(dur)
             dur_list.append(idur)
     return dur_list, cycle
 
+def get_replication_name(node_id): #cj28
+    node_id = node_id
+    rep_name = aapi.ANGConnGetReplicationId()
+
+    replications = model.getCatalog().getObjectsByType(model.getType("GKReplication"))
+    for replication in replications.values():
+        rep_seed = replication.getRandomSeed()
+
+    return rep_name, rep_seed
+
+def export_delay_action(node_id, delay, action_list, time, timeSta):
+    time = time
+    timeSta = timeSta
+    ave_app_delay = delay
+    data_list = [time,delay]
+    
+    for action in action_list:
+        data_list.append(action)
+
+    with open(rep_name, 'a') as csvFile:
+        csv_writer = csv.writer(csvFile)
+        csv_writer.writerows([data_list,])
 
 def AAPILoad():
     return 0
@@ -143,7 +161,8 @@ def AAPILoad():
 
 def AAPIInit():
     #set_replication_seed(seed)
-    #print(seed)
+    name,seed = get_replication_name(node_id)
+    print(name,seed)
     return 0
 
 
@@ -154,41 +173,13 @@ def AAPIManage(time, timeSta, timeTrans, acycle):
 
 def AAPIPostManage(time, timeSta, timeTrans, acycle):
     # print( "AAPIPostManage" )
-    if time % (15*60) == 0:
-        time = time
-        timeSta = timeSta
-        ave_app_delay = aapi.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
-        dur_list, cycle= get_phase_duration_list(node_id, timeSta)
-        barrier = (sum(dur_list[0:2]), sum(dur_list[2:4]))
-           # print('dt: {:.4f}, tt: {:.4f}'.format(estad.DTa, estad.TTa))
-           # print('\n Mean Queue: \t {}'.format(estad.))
-
-        if replication_name == 8050297:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay), 
-                    '1': '{}'.format(dur_list[0]), '3': '{}'.format(dur_list[1]), '5': '{}'.format(dur_list[2]), 
-                    '7': '{}'.format(dur_list[3]), '9': '{}'.format(dur_list[4]), '11': '{}'.format(dur_list[5]), 
-                    '13': '{}'.format(dur_list[6]), '15': '{}'.format(dur_list[7]),
-                    'cycle': '{}'.format(cycle), 'barrier': '{}'.format(barrier)})
-
-        elif replication_name == 8050315:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay), 
-                    '1': '{}'.format(dur_list[0]), '3': '{}'.format(dur_list[1]), '5': '{}'.format(dur_list[2]), 
-                    '7': '{}'.format(dur_list[3]), '9': '{}'.format(dur_list[4]), '11': '{}'.format(dur_list[5]), 
-                    '13': '{}'.format(dur_list[6]), '15': '{}'.format(dur_list[7]),
-                    'cycle': '{}'.format(cycle), 'barrier': '{}'.format(barrier)})
-
-        if replication_name == 8050322:
-            with open('{}.csv'.format(replication_name), 'a') as csvFile:
-                csv_writer = csv.DictWriter(csvFile, fieldnames=fieldnames)
-                csv_writer.writerow({'time': '{}'.format(time), 'delay_time': '{}'.format(ave_app_delay), 
-                    '1': '{}'.format(dur_list[0]), '3': '{}'.format(dur_list[1]), '5': '{}'.format(dur_list[2]), 
-                    '7': '{}'.format(dur_list[3]), '9': '{}'.format(dur_list[4]), '11': '{}'.format(dur_list[5]), 
-                    '13': '{}'.format(dur_list[6]), '15': '{}'.format(dur_list[7]),
-                    'cycle': '{}'.format(cycle), 'barrier': '{}'.format(barrier)})
+    if time % 900 == 0:
+        action_list = []
+        for phase in green_phases:
+            normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
+            action_list.append(normalDuration)
+        delay = aapi.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+        export_delay_action(node_id, delay, action_list, time, timeSta)
 
     """# console = cs.ANGConsole()
     if time == interval:

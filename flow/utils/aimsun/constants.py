@@ -142,9 +142,6 @@ INT_GET_REPLICATION_NAME = 0x27
 #: get green phase utilization
 INT_GET_GREEN_UTIL = 0x28
 
-#: get average approach delay in a node
-INT_GET_AVE_APP_DELAY = 0x29
-
 ###############################################################################
 #                           Detector Commands                            #
 ###############################################################################

@@ -16,30 +16,47 @@ sys.path.append(os.path.join(config.AIMSUN_NEXT_PATH,
 import flow.utils.aimsun.control_plans as cp  # noqa
 from PyANGKernel import *  # noqa
 import AAPI as aimsun_api  # noqa
+from aimsun_props import Aimsun_Params, Export_Params
 
+ap = Aimsun_Params('/home/cjrsantos/flow/flow/utils/aimsun/aimsun_props.csv')
 ## Export files
-writeFlag = True
+writeFlag = False
 
 model = GKSystem.getSystem().getActiveModel()
 PORT = int(model.getAuthor())
 entered_vehicles = []
 exited_vehicles = []
 
+target_nodes = [3329, 3344, 3370, 3341, 3369]
 start_time = [0]*2
 ut_time = [0]*2
-starting_phases = [1,7]
+green_phases = {}
+starting_phases = {} 
 time_consumed = {}
 occurence = {}
-green_phases = [1,3,5,7,9,11]
-node_id = 3370
+phaseUtil = {}
+
+#green_phases = dict.fromkeys(target_nodes)
+#starting_phases = dict.fromkeys(target_nodes)
+#time_consumed = dict.fromkeys(target_nodes,0)
+#occurence = dict.fromkeys(target_nodes,0)
+#phaseUtil = dict.fromkeys(target_nodes,0)
+
+for node_id in target_nodes:
+    time_consumed[node_id] = {}
+    occurence[node_id] = {}
+    phaseUtil[node_id] = {}
+
+    green_phase_list = ap.get_green_phases(node_id)
+    starting_phases_list = ap.get_start_phases(node_id)
+    starting_phases[node_id] = starting_phases_list
+    green_phases[node_id] = green_phase_list
+    time_consumed[node_id] = dict.fromkeys(green_phase_list,0)
+    occurence[node_id] = dict.fromkeys(green_phase_list,0) # dictionary of node and their phases {node_id:None,...}
 
 if writeFlag == True:
     rep_name = aimsun_api.ANGConnGetReplicationId()
-    from aimsun_props import Export_Params
-    export_params = Export_Params(rep_name,node_id)
-
-time_consumed = dict.fromkeys(green_phases,0) # dictionary of phases {0:None, 1:none,...} Note: Only green phases
-occurence = dict.fromkeys(green_phases,0)
+    export_params = Export_Params(rep_name, 3344)
 
 def get_duration_phase(node_id, phase, timeSta):
     normalDurationP = aimsun_api.doublep()
@@ -53,10 +70,12 @@ def get_duration_phase(node_id, phase, timeSta):
 
     return normalDuration, maxDuration, minDuration
 
-def gUtil_at_interval(ttime, occurs, timeSta):
+def gUtil_at_interval(node_id, ttime, occurs, timeSta):
+    global phaseUtil
     action_duration = []
+    phase_util = []
     delta = 1e-3
-    phase_list =green_phases
+    phase_list = green_phases[node_id]
     for phase in phase_list:
         normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
         action_duration.append(normalDuration)
@@ -64,9 +83,8 @@ def gUtil_at_interval(ttime, occurs, timeSta):
     generated_Duration = action_duration
     control_id = aimsun_api.ECIGetNumberCurrentControl(node_id)
     # what i need is the time_consumed, occurence, generated_duration
-    phase_util = []
-    gp_ttime = list(ttime.values()) #list of total times
-    gp_occur = list(occurs.values()) # list of no. occurences
+    gp_ttime = list(ttime[node_id].values()) #list of total times
+    gp_occur = list(occurs[node_id].values()) # list of no. occurences
     gen_dur = generated_Duration # list of generated action for the interval
 
     for tsecs, occur, dur in zip(gp_ttime, gp_occur, gen_dur):
@@ -77,10 +95,12 @@ def gUtil_at_interval(ttime, occurs, timeSta):
         util = (abs(mean_t - dur))/(dur + delta)
         #print(mean_t, dur, util)
         phase_util.append(util)
-    
+
+    node_gutil = sum(phase_util)
+    phaseUtil[node_id] = node_gutil
     #print(gp_ttime, gp_occur, gen_dur)
     
-    return phase_util
+    return node_gutil
 
 def get_current_phase(node_id):
     num_rings = aimsun_api.ECIGetCurrentNbRingsJunction(node_id)
@@ -97,20 +117,21 @@ def get_green_time(node_id, time, timeSta):
     #initialize values
     cur_phases = get_current_phase(node_id)
     global ut_time, start_time, time_consumed, occurence, starting_phases
+    start_phases = starting_phases[node_id]
 
-    for i, (cur_phase, start_phase) in enumerate(zip(cur_phases, starting_phases)):
+    for i, (cur_phase, start_phase) in enumerate(zip(cur_phases, start_phases)):
         if cur_phase != start_phase:
             new_time = round(time)
             ut_time[i] = abs(new_time - start_time[i])
             #print(start_phase,start_time[i], new_time, ut_time[i])
             start_time[i] = new_time
-            starting_phases[i] = cur_phase
+            starting_phases[node_id][i] = cur_phase
             if aimsun_api.ECIIsAnInterPhase(node_id,start_phase,timeSta) == 0:
-                time_consumed[start_phase] += ut_time[i]
-                occurence[start_phase] += 1
+                time_consumed[node_id][start_phase] += ut_time[i]
+                occurence[node_id][start_phase] += 1
                 
+    return None
 
-    return time_consumed, occurence
 def send_message(conn, in_format, values):
     """Send a message to the client.
 
@@ -650,14 +671,6 @@ def threaded_client(conn, **kwargs):
 
                 send_message(conn, in_format='str', values=(output,))
 
-            elif data == ac.INT_GET_AVE_APP_DELAY:
-                send_message(conn, in_format='i', values=(0,))
-                node_id, = retrieve_message(conn, 'i')
-
-                ave_app_delay = cp.get_ave_app_delay(node_id)
-
-                send_message(conn, in_format='f', values=(ave_app_delay,))
-
             elif data == ac.INT_GET_CUME_QUEUE_LENGTH:
                 send_message(conn, in_format='i', values=(0,))
                 section_id, = retrieve_message(conn, 'i')
@@ -733,8 +746,9 @@ def AAPIInit():
 def AAPIManage(time, timeSta, timeTrans, acycle):
     """Execute commands before an Aimsun simulation step."""
     # Create a thread when data needs to be sent back to FLOW
-    time_consumed, occurence = get_green_time(node_id, time, timeSta)
     global time_consumed, occurence
+    for node_id in target_nodes:
+        get_green_time(node_id, time, timeSta)
 
     delta = 0.8/2
     # - delta < time%900 < + delta
@@ -743,9 +757,11 @@ def AAPIManage(time, timeSta, timeTrans, acycle):
     # math.isclose(time, 900, a_tol=delta)
     # if math.isclose(time%900, 0, abs_tol=delta) or math.isclose(time%900, 900, abs_tol=delta):
     if ((time % 900) > -delta and (time % 900) < delta) or ((time % 900) > 900-delta and (time % 900) < 900+delta):
-        gp_Util = gUtil_at_interval(time_consumed, occurence, timeSta)
-        #print(gp_Util)
-        #print(time)
+        gp_Util = []
+        for node_id in target_nodes:
+            gutil = gUtil_at_interval(node_id, time_consumed, occurence, timeSta)
+            gp_Util.append(gutil)
+
         # tcp/ip connection from the aimsun process
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -759,22 +775,24 @@ def AAPIManage(time, timeSta, timeTrans, acycle):
         kwargs = {"time": time, "timeSta": timeSta, "timeTrans": timeTrans, "acycle": acycle, "gp_Util": gp_Util}
         start_new_thread(threaded_client, (c,), kwargs)
 
-        time_consumed = dict.fromkeys(time_consumed,0)
-        occurence = dict.fromkeys(occurence,0)
-
     return 0
 
 
 def AAPIPostManage(time, timeSta, timeTrans, acycle):
     """Execute commands after an Aimsun simulation step."""
-    if writeFlag == True:
-        if time % 900 == 0:
-            action_list = []
-            for phase in green_phases:
-                normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
-                action_list.append(normalDuration)
-            delay = aimsun_api.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
-            export_params.export_delay_action(node_id, delay, action_list, time, timeSta)
+    delta = 0.8/2
+    if ((time % 900) > -delta and (time % 900) < delta) or ((time % 900) > 900-delta and (time % 900) < 900+delta):
+        time_consumed = dict.fromkeys(target_nodes,0)
+        occurence = dict.fromkeys(target_nodes,0)
+        phaseUtil = dict.fromkeys(target_nodes,0)
+
+
+        if writeFlag == True:
+            for node_id in target_nodes:
+                action_list = []
+                delay = aimsun_api.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+                export_params.export_delay_action(node_id, delay, action_list, phaseUtil[node_id], time, timeSta)
+
     return 0
 
 

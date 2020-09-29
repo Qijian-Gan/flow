@@ -189,19 +189,19 @@ def get_detector_lanes(edge_id):
                 pass
     return detector_lanes
 
-
-
 def get_detector_ids(edge_id):
     catalog = model.getCatalog()
     detector_list = {"left": [], "right":[], "through":[],"advanced": []}
+    section_inf = aapi.AKIInfNetGetSectionANGInf(edge_id)
     for i in range(aapi.AKIDetGetNumberDetectors()):
         detector = aapi.AKIDetGetPropertiesDetector(i)
         if detector.IdSection == edge_id:
             edge_aimsun = catalog.find(detector.IdSection)
+            num_lanes = int(section_inf.nbCentralLanes + section_inf.nbSideLanes)
 
-            if (edge_aimsun.length2D() - detector.FinalPosition) < 6 and (detector.IdFirstLane == 3 or detector.IdFirstLane == 2): # 3or2 for 3370, 4 for 3369
+            if (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdLastLane == num_lanes: # 3or2 for 3370, 4 for 3369
                 kind = "left"
-            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 0: #0 for 3370, 1 for 3369
+            elif (edge_aimsun.length2D() - detector.FinalPosition) < 6 and detector.IdFirstLane == 1 and num_lanes > 3: #0 for 3370, 1 for 3369
                 kind = "right"
             elif (edge_aimsun.length2D() - detector.FinalPosition) < 6:
                 kind = "through"
@@ -215,8 +215,5 @@ def get_detector_ids(edge_id):
                 detector_list[kind].append(detector.Id)
             except ValueError:
                 pass
-    return detector_list
 
-def get_ave_app_delay(node_id):
-    ave_app_delay = aapi.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
-    return ave_app_delay
+    return detector_list
