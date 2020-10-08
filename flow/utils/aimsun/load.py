@@ -1,11 +1,20 @@
 # flake8: noqa
 """Script to load an Aimsun instance from a template."""
+from flow.utils.aimsun.scripting_api import AimsunTemplate
+import flow.config as config
 import os
 import json
-
-import flow.config as config
-from flow.utils.aimsun.scripting_api import AimsunTemplate
 import sys
+sys.path.append('/home/damian/anaconda3/envs/aimsun_flow/lib/python2.7/site-packages')
+import numpy as np
+
+
+RLLIB_HORIZON = 3  # copy from train_rllib.py
+RLLIB_TRAINING_ITERATIONS = 1000000  # copy from train_rllib.py
+REPLICATION_LIST = ['Replication 8050297', # 5-11
+                    'Replication 8050315',  # 10-14
+                    'Replication 8050322'  # 14-21
+                    ]
 
 
 def load_network():
@@ -122,21 +131,28 @@ def get_dict_from_objects(sections, nodes, turnings, cen_connections):
 
     return scenario_data
 
+
 port_string = sys.argv[1]
 
 # collect template path
 file_path = os.path.join(config.PROJECT_PATH,
-                         'flow/utils/aimsun/aimsun_template_path_%s'%port_string)
+                         'flow/utils/aimsun/aimsun_template_path_%s' % port_string)
 with open(file_path, 'r') as f:
     template_path = f.readline()
 os.remove(file_path)
 
 # open template in Aimsun
 print('[load.py] Loading template ' + template_path)
+try:
+    # unshackle the chains
+    os.remove("%s.lck" % template_path)
+except:
+    pass
 model = AimsunTemplate(GKSystem, GKGUISystem)
 model.load(template_path)
 
 # HACK: Store port in author
+## modify this to pass lists? [port_string, sim_step, sims_per_step] #debug_time
 model.setAuthor(port_string)
 
 # collect the simulation parameters
@@ -176,7 +192,7 @@ else:
     scenario_data = load_network()
 
 # save template's scenario into a file to be loaded into Flow's scenario
-scenario_data_file = 'flow/core/kernel/network/network_data_%s.json'%port_string
+scenario_data_file = 'flow/core/kernel/network/network_data_%s.json' % port_string
 scenario_data_path = os.path.join(config.PROJECT_PATH, scenario_data_file)
 with open(scenario_data_path, 'w') as f:
     json.dump(scenario_data, f, sort_keys=True, indent=4)
@@ -185,7 +201,7 @@ with open(scenario_data_path, 'w') as f:
 
 # create a check file to announce that we are done
 # writing all the network data into the .json file
-check_file = 'flow/core/kernel/network/network_data_check_%s'%port_string
+check_file = 'flow/core/kernel/network/network_data_check_%s' % port_string
 check_file_path = os.path.join(config.PROJECT_PATH, check_file)
 open(check_file_path, 'a').close()
 
@@ -193,5 +209,27 @@ open(check_file_path, 'a').close()
 col_sim = model.get_column('GKExperiment::simStepAtt')
 # set new simulation step value
 experiment.set_data_value(col_sim, data['sim_step'])
-# run the simulation
-model.run_replication(replication=replication, render=data['render'])
+
+while True:
+    # run the simulation
+    replication_name = np.random.choice(REPLICATION_LIST)
+    replication = model.find_by_name(model.replications, replication_name)
+
+    if replication is None:
+        print('[load.py] ERROR: Replication ' + replication_name + ' does not exist.')
+
+    # retrieve experiment and scenario
+    experiment = replication.experiment
+    scenario = experiment.scenario
+    scenario_data = scenario.input_data
+    scenario_data.add_extension(os.path.join(config.PROJECT_PATH, 'flow/utils/aimsun/run.py'), True)
+
+    # set new simulation step value
+    experiment.set_data_value(col_sim, data['sim_step'])
+
+    print('[load.py] ' + replication_name + ' running.')
+    model.run_replication(replication=replication, render=data['render'])
+
+    # only use the loop for training
+    if data['render']:
+        break

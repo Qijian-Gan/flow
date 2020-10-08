@@ -1,26 +1,136 @@
 # flake8: noqa
 """Script used to interact with Aimsun's API during the simulation phase."""
-import flow.config as config
+import json
+import numpy as np
+from thread import start_new_thread
+import struct
+import socket
 import sys
 import os
+import math
+import flow.utils.aimsun.constants as ac
+import flow.config as config
 
 sys.path.append(os.path.join(config.AIMSUN_NEXT_PATH,
                              'programming/Aimsun Next API/AAPIPython/Micro'))
+import flow.utils.aimsun.control_plans as cp  # noqa
+from PyANGKernel import *  # noqa
+import AAPI as aimsun_api  # noqa
+from aimsun_props import Aimsun_Params, Export_Params
 
-import flow.utils.aimsun.constants as ac
-import AAPI as aimsun_api
-from AAPI import *
-from PyANGKernel import *
-import socket
-import struct
-from thread import start_new_thread
-import numpy as np
+ap = Aimsun_Params('/home/damian/flow/flow/utils/aimsun/aimsun_props.csv')
+## Export files
+writeFlag = False
 
 model = GKSystem.getSystem().getActiveModel()
 PORT = int(model.getAuthor())
 entered_vehicles = []
 exited_vehicles = []
 
+target_nodes = [3329, 3344, 3370, 3341, 3369]
+start_time = [0]*2
+ut_time = [0]*2
+green_phases = {}
+starting_phases = {} 
+time_consumed = {}
+occurence = {}
+phaseUtil = {}
+
+#green_phases = dict.fromkeys(target_nodes)
+#starting_phases = dict.fromkeys(target_nodes)
+#time_consumed = dict.fromkeys(target_nodes,0)
+#occurence = dict.fromkeys(target_nodes,0)
+#phaseUtil = dict.fromkeys(target_nodes,0)
+
+for node_id in target_nodes:
+    time_consumed[node_id] = {}
+    occurence[node_id] = {}
+    phaseUtil[node_id] = {}
+
+    green_phase_list = ap.get_green_phases(node_id)
+    starting_phases_list = ap.get_start_phases(node_id)
+    starting_phases[node_id] = starting_phases_list
+    green_phases[node_id] = green_phase_list
+    time_consumed[node_id] = dict.fromkeys(green_phase_list,0)
+    occurence[node_id] = dict.fromkeys(green_phase_list,0) # dictionary of node and their phases {node_id:None,...}
+
+if writeFlag == True:
+    rep_name = aimsun_api.ANGConnGetReplicationId()
+    export_params = Export_Params(rep_name, 3344)
+
+def get_duration_phase(node_id, phase, timeSta):
+    normalDurationP = aimsun_api.doublep()
+    maxDurationP = aimsun_api.doublep()
+    minDurationP = aimsun_api.doublep()
+    aimsun_api.ECIGetDurationsPhase(node_id, phase, timeSta,
+                              normalDurationP, maxDurationP, minDurationP)
+    normalDuration = normalDurationP.value()
+    maxDuration = maxDurationP.value()
+    minDuration = minDurationP.value()
+
+    return normalDuration, maxDuration, minDuration
+
+def gUtil_at_interval(node_id, ttime, occurs, timeSta):
+    global phaseUtil
+    action_duration = []
+    phase_util = []
+    delta = 1e-3
+    phase_list = green_phases[node_id]
+    for phase in phase_list:
+        normalDuration, _, _ = get_duration_phase(node_id, phase, timeSta)
+        action_duration.append(normalDuration)
+
+    generated_Duration = action_duration
+    control_id = aimsun_api.ECIGetNumberCurrentControl(node_id)
+    # what i need is the time_consumed, occurence, generated_duration
+    gp_ttime = list(ttime[node_id].values()) #list of total times
+    gp_occur = list(occurs[node_id].values()) # list of no. occurences
+    gen_dur = generated_Duration # list of generated action for the interval
+
+    for tsecs, occur, dur in zip(gp_ttime, gp_occur, gen_dur):
+        try:
+            mean_t = tsecs/occur
+        except ZeroDivisionError:
+            mean_t = 0
+        util = (abs(mean_t - dur))/(dur + delta)
+        #print(mean_t, dur, util)
+        phase_util.append(util)
+
+    node_gutil = sum(phase_util)
+    phaseUtil[node_id] = node_gutil
+    #print(gp_ttime, gp_occur, gen_dur)
+    
+    return node_gutil
+
+def get_current_phase(node_id):
+    num_rings = aimsun_api.ECIGetCurrentNbRingsJunction(node_id)
+    num_phases = [0]*num_rings
+    curr_phase = [None]*num_rings
+    for ring_id in range(num_rings):
+        num_phases[ring_id] = aimsun_api.ECIGetNumberPhasesInRing(node_id, ring_id)
+        curr_phase[ring_id] = aimsun_api.ECIGetCurrentPhaseInRing(node_id, ring_id)
+        if ring_id > 0:
+            curr_phase[ring_id] += num_phases[ring_id]
+    return curr_phase
+
+def get_green_time(node_id, time, timeSta):
+    #initialize values
+    cur_phases = get_current_phase(node_id)
+    global ut_time, start_time, time_consumed, occurence, starting_phases
+    start_phases = starting_phases[node_id]
+
+    for i, (cur_phase, start_phase) in enumerate(zip(cur_phases, start_phases)):
+        if cur_phase != start_phase:
+            new_time = round(time)
+            ut_time[i] = abs(new_time - start_time[i])
+            #print(start_phase,start_time[i], new_time, ut_time[i])
+            start_time[i] = new_time
+            starting_phases[node_id][i] = cur_phase
+            if aimsun_api.ECIIsAnInterPhase(node_id,start_phase,timeSta) == 0:
+                time_consumed[node_id][start_phase] += ut_time[i]
+                occurence[node_id][start_phase] += 1
+                
+    return None
 
 def send_message(conn, in_format, values):
     """Send a message to the client.
@@ -100,7 +210,7 @@ def retrieve_message(conn, out_format):
     return unpacked_data
 
 
-def threaded_client(conn):
+def threaded_client(conn, **kwargs):
     """Create a threaded process.
 
     This process is called every simulation step to interact with the aimsun
@@ -137,6 +247,14 @@ def threaded_client(conn):
             # thereby terminating the socket connection as well.
             elif data == ac.SIMULATION_TERMINATE:
                 send_message(conn, in_format='i', values=(0,))
+                done = True
+
+            # resets the simulation without closing AIMSUN
+            elif data == ac.SIMULATION_RESET:
+                send_message(conn, in_format='i', values=(0,))
+
+                # sends a signal to cancel the simulation
+                aimsun_api.ANGSetSimulationOrder(1, 0)
                 done = True
 
             elif data == ac.ADD_VEHICLE:
@@ -239,7 +357,7 @@ def threaded_client(conn):
                 vehicle = model.getCatalog().findByName(
                     type_id, type_vehicle)
                 aimsun_type = vehicle.getId()
-                aimsun_type_pos = AKIVehGetVehTypeInternalPosition(aimsun_type)
+                aimsun_type_pos = aimsun_api.AKIVehGetVehTypeInternalPosition(aimsun_type)
 
                 send_message(conn, in_format='i', values=(aimsun_type_pos,))
 
@@ -336,41 +454,43 @@ def threaded_client(conn):
                     tracking_info = aimsun_api.AKIVehGetInf(veh_id)
 
                 data = (
-                          # tracking_info.report,
-                          # tracking_info.idVeh,
-                          # tracking_info.type,
-                          tracking_info.CurrentPos,
-                          tracking_info.distance2End,
-                          tracking_info.xCurrentPos,
-                          tracking_info.yCurrentPos,
-                          tracking_info.zCurrentPos,
-                          tracking_info.xCurrentPosBack,
-                          tracking_info.yCurrentPosBack,
-                          tracking_info.zCurrentPosBack,
-                          tracking_info.CurrentSpeed,
-                          # tracking_info.PreviousSpeed,
-                          tracking_info.TotalDistance,
-                          # tracking_info.SystemGenerationT,
-                          # tracking_info.SystemEntranceT,
-                          tracking_info.SectionEntranceT,
-                          tracking_info.CurrentStopTime,
-                          tracking_info.stopped,
-                          tracking_info.idSection,
-                          tracking_info.segment,
-                          tracking_info.numberLane,
-                          tracking_info.idJunction,
-                          tracking_info.idSectionFrom,
-                          tracking_info.idLaneFrom,
-                          tracking_info.idSectionTo,
-                          tracking_info.idLaneTo)
-                
+                    # tracking_info.report,
+                    # tracking_info.idVeh,
+                    # tracking_info.type,
+                    tracking_info.CurrentPos,
+                    tracking_info.distance2End,
+                    tracking_info.xCurrentPos,
+                    tracking_info.yCurrentPos,
+                    tracking_info.zCurrentPos,
+                    tracking_info.xCurrentPosBack,
+                    tracking_info.yCurrentPosBack,
+                    tracking_info.zCurrentPosBack,
+                    tracking_info.CurrentSpeed,
+                    # tracking_info.PreviousSpeed,
+                    tracking_info.TotalDistance,
+                    # tracking_info.SystemGenerationT,
+                    # tracking_info.SystemEntranceT,
+                    tracking_info.SectionEntranceT,
+                    tracking_info.CurrentStopTime,
+                    tracking_info.stopped,
+                    tracking_info.idSection,
+                    tracking_info.segment,
+                    tracking_info.numberLane,
+                    tracking_info.idJunction,
+                    tracking_info.idSectionFrom,
+                    tracking_info.idLaneFrom,
+                    tracking_info.idSectionTo,
+                    tracking_info.idLaneTo)
+
                 # form the output and output format according to the bitmap
                 output = []
                 in_format = ''
                 for i in range(len(info_bitmap)):
                     if info_bitmap[i] == '1':
-                        if i <= 12: in_format += 'f '
-                        else: in_format += 'i '
+                        if i <= 12:
+                            in_format += 'f '
+                        else:
+                            in_format += 'i '
                         output.append(data[i])
                 if in_format == '':
                     return
@@ -399,7 +519,7 @@ def threaded_client(conn):
             elif data == ac.VEH_GET_NEXT_SECTION:
                 send_message(conn, in_format='i', values=(0,))
                 veh_id, section = retrieve_message(conn, 'i i')
-                next_section = AKIVehInfPathGetNextSection(veh_id, section)
+                next_section = aimsun_api.AKIVehInfPathGetNextSection(veh_id, section)
                 send_message(conn, in_format='i', values=(next_section,))
 
             elif data == ac.VEH_GET_ROUTE:
@@ -420,7 +540,7 @@ def threaded_client(conn):
                 else:
                     meter_ids = []
                     for i in range(1, num_meters + 1):
-                        struct_metering = ECIGetMeteringProperties(i)
+                        struct_metering = aimsun_api.ECIGetMeteringProperties(i)
                         meter_id = struct_metering.Id
                         meter_ids.append(meter_id)
                     output = ':'.join([str(e) for e in meter_ids])
@@ -429,10 +549,10 @@ def threaded_client(conn):
             elif data == ac.TL_SET_STATE:
                 send_message(conn, in_format='i', values=(0,))
                 meter_aimsun_id, state = retrieve_message(conn, 'i i')
-                time = AKIGetCurrentSimulationTime()  # simulation time
-                sim_step = AKIGetSimulationStepTime()
+                time = aimsun_api.AKIGetCurrentSimulationTime()  # simulation time
+                sim_step = aimsun_api.AKIGetSimulationStepTime()
                 identity = 0
-                ECIChangeStateMeteringById(
+                aimsun_api.ECIChangeStateMeteringById(
                     meter_aimsun_id, state, time, sim_step, identity)
                 send_message(conn, in_format='i', values=(0,))
 
@@ -440,7 +560,7 @@ def threaded_client(conn):
                 send_message(conn, in_format='i', values=(0,))
                 meter_aimsun_id = retrieve_message(conn, 'i')
                 lane_id = 1  # TODO double check
-                state = ECIGetCurrentStateofMeteringById(
+                state = aimsun_api.ECIGetCurrentStateofMeteringById(
                     meter_aimsun_id, lane_id)
                 send_message(conn, in_format='i', values=(state,))
 
@@ -458,11 +578,151 @@ def threaded_client(conn):
 
                 if edge_aimsun:
                     send_message(conn, in_format='i',
-                             values=(edge_aimsun.getId(),))
+                                 values=(edge_aimsun.getId(),))
                 else:
                     send_message(conn, in_format='i',
-                            values=(int(edge),))
+                                 values=(int(edge),))
+            elif data == ac.INT_GET_OFFSET:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
 
+                offset = cp.get_intersection_offset(node_id)
+
+                send_message(conn, in_format='i', values=(offset,))
+
+            elif data == ac.INT_CHANGE_OFFSET:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, offset = retrieve_message(conn, 'i f')
+
+                time = kwargs.get('time')
+                timeSta = kwargs.get('timeSta')
+                acycle = kwargs.get('acycle')
+                cp.change_offset(node_id, offset, time, timeSta, acycle)
+            
+            elif data == ac.INT_GET_REPLICATION_NAME:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
+
+                rep_name, rep_seed = cp.get_replication_name(node_id)
+
+                send_message(conn, in_format='i i', values=(rep_name,rep_seed,))
+
+            elif data == ac.INT_GET_DURATION_PHASE:  # cj
+                send_message(conn, in_format='i', values=(0,))
+                node_id, phase = retrieve_message(conn, 'i i')
+
+                normalDuration, maxDuration, minDuration = cp.get_duration_phase(node_id, phase, timeSta)
+
+                send_message(conn, in_format='f f f', values=(normalDuration, maxDuration, minDuration,))
+
+            elif data == ac.INT_GET_CYCLE_LENGTH:  # cj
+                send_message(conn, in_format='i', values=(0,))
+                node_id, control_id = retrieve_message(conn, 'i i')
+
+                control_cycle = cp.get_cycle_length(node_id, control_id)
+
+                send_message(conn, in_format='f', values=(control_cycle,))
+
+            elif data == ac.INT_GET_CONTROL_IDS:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
+
+                control_id, num_rings = cp.get_control_ids(node_id)
+
+                send_message(conn, in_format='i i', values=(control_id, num_rings,))
+
+            elif data == ac.INT_GET_GREEN_PHASES:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, ring_id = retrieve_message(conn, 'i i')
+
+                green_phases = cp.get_green_phases(node_id, ring_id, timeSta)
+                output = ','.join(str(i) for i in green_phases)
+
+                send_message(conn, in_format='str', values=(output,))
+
+            elif data == ac.INT_GET_GREEN_UTIL:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
+
+                control_id, num_rings = cp.get_control_ids(node_id)
+                gpUtil = kwargs.get('gp_Util') #list of utilization per phase :)
+
+                #send_message(conn, in_format='f', values=(g_Util,))
+
+                gpUtil_list = ','.join(str(i) for i in gpUtil)
+
+                send_message(conn, in_format='str', values=(gpUtil_list,))
+
+            elif data == ac.INT_CHANGE_PHASE_DURATION:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, phase, duration, maxout = retrieve_message(conn, 'i i f f')
+
+                time = kwargs.get('time')
+                timeSta = kwargs.get('timeSta')
+                acycle = kwargs.get('acycle')
+                cp.change_phase_duration(node_id, phase, duration, maxout, time, timeSta, acycle)
+
+            elif data == ac.INT_GET_IN_EDGES:
+                send_message(conn, in_format='i', values=(0,))
+                node_id, = retrieve_message(conn, 'i')
+
+                edge_ids = cp.get_incoming_edges(node_id)
+                output = ','.join(str(i) for i in edge_ids)
+
+                send_message(conn, in_format='str', values=(output,))
+
+            elif data == ac.INT_GET_CUME_QUEUE_LENGTH:
+                send_message(conn, in_format='i', values=(0,))
+                section_id, = retrieve_message(conn, 'i')
+
+                cume_queue_length = cp.get_cumulative_queue_length(section_id)
+
+                send_message(conn, in_format='f', values=(cume_queue_length,))
+
+            elif data == ac.DET_GET_IDS_ON_EDGE:
+                send_message(conn, in_format='i', values=(0,))
+                edge_id, = retrieve_message(conn, 'i')
+
+                detector_list = cp.get_detector_ids(edge_id)
+                output = json.dumps(detector_list)
+
+                send_message(conn, in_format='str', values=(output,))
+            
+            elif data == ac.DET_GET_DETECTOR_LANES: #cj
+                send_message(conn, in_format='i', values=(0,))
+                edge_id, = retrieve_message(conn, 'i')
+
+                detector_lanes = cp.get_detector_lanes(edge_id)
+                output = json.dumps(detector_lanes)
+
+                send_message(conn, in_format='str', values=(output,))
+
+            elif data == ac.DET_GET_COUNT_AND_OCCUPANCY:
+                send_message(conn, in_format='i', values=(0,))
+                detector_id, = retrieve_message(conn, 'i')
+
+                flow, occupancy = cp.get_detector_count_and_occupancy(detector_id)
+
+                send_message(conn, in_format='i f', values=(flow, occupancy))
+
+            elif data == ac.DET_SET_STAT_INTERVAL:
+                send_message(conn, in_format='i', values=(0,))
+                hour, minute, sec = retrieve_message(conn, 'i i i')
+
+                cp.set_statistical_interval(hour, minute, sec)
+
+            elif data == ac.DET_SET_DETECTION_INTERVAL:
+                send_message(conn, in_format='i', values=(0,))
+                hour, minute, sec = retrieve_message(conn, 'i i i')
+
+                cp.set_detection_interval(hour, minute, sec)
+
+            elif data == ac.REPL_SET_SEED:
+                send_message(conn, in_format='i', values=(0,))
+                seed, = retrieve_message(conn, 'i')
+
+                cp.set_replication_seed(seed)
+            
             # in case the message is unknown, return -1001
             else:
                 send_message(conn, in_format='i', values=(-1001,))
@@ -479,29 +739,60 @@ def AAPILoad():
 def AAPIInit():
     """Execute commands while the Aimsun instance is initializing."""
     # set the simulation time to be very large
-    AKISetEndSimTime(2e6)
+    aimsun_api.AKISetEndSimTime(2e6)
     return 0
 
 
 def AAPIManage(time, timeSta, timeTrans, acycle):
     """Execute commands before an Aimsun simulation step."""
-    # tcp/ip connection from the aimsun process
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind(('localhost', PORT))
+    # Create a thread when data needs to be sent back to FLOW
+    global time_consumed, occurence
+    for node_id in target_nodes:
+        get_green_time(node_id, time, timeSta)
 
-    # connect to the Flow instance
-    server_socket.listen(10)
-    c, address = server_socket.accept()
+    delta = 0.8/2
+    # - delta < time%900 < + delta
+    ## TODO: pass sim_step, sims_per_step
+    ## compare aimsun_time with flow_time.  flow_time is sim_step*sims_per_step
+    # math.isclose(time, 900, a_tol=delta)
+    # if math.isclose(time%900, 0, abs_tol=delta) or math.isclose(time%900, 900, abs_tol=delta):
+    if ((time % 900) > -delta and (time % 900) < delta) or ((time % 900) > 900-delta and (time % 900) < 900+delta):
+        gp_Util = []
+        for node_id in target_nodes:
+            gutil = gUtil_at_interval(node_id, time_consumed, occurence, timeSta)
+            gp_Util.append(gutil)
 
-    # start the threaded process
-    start_new_thread(threaded_client, (c,))
+        # tcp/ip connection from the aimsun process
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(('localhost', PORT))
+
+        # connect to the Flow instance
+        server_socket.listen(10)
+        c, address = server_socket.accept()
+
+        # start the threaded process
+        kwargs = {"time": time, "timeSta": timeSta, "timeTrans": timeTrans, "acycle": acycle, "gp_Util": gp_Util}
+        start_new_thread(threaded_client, (c,), kwargs)
 
     return 0
 
 
 def AAPIPostManage(time, timeSta, timeTrans, acycle):
     """Execute commands after an Aimsun simulation step."""
+    delta = 0.8/2
+    if ((time % 900) > -delta and (time % 900) < delta) or ((time % 900) > 900-delta and (time % 900) < 900+delta):
+        time_consumed = dict.fromkeys(target_nodes,0)
+        occurence = dict.fromkeys(target_nodes,0)
+        phaseUtil = dict.fromkeys(target_nodes,0)
+
+
+        if writeFlag == True:
+            for node_id in target_nodes:
+                action_list = []
+                delay = aimsun_api.AKIEstGetPartialStatisticsNodeApproachDelay(node_id)
+                export_params.export_delay_action(node_id, delay, action_list, phaseUtil[node_id], time, timeSta)
+
     return 0
 
 

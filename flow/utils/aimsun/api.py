@@ -2,6 +2,7 @@
 import socket
 import logging
 import struct
+import json
 
 import flow.utils.aimsun.constants as ac
 import flow.utils.aimsun.struct as aimsun_struct
@@ -26,13 +27,14 @@ def create_client(port, print_status=False):
     """
     # create a socket connection
     if print_status:
-        print('Listening for connection...', end=' ')
+        print('Listening for connection... %s' % port, end=' ')
 
     stop = False
     while not stop:
         # try to connect
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # s.settimeout(2)
             s.connect(('localhost', port))
 
             # check the connection
@@ -178,6 +180,15 @@ class FlowAimsunAPI(object):
 
         # terminate the connection
         self.s.close()
+
+    def reset_simulation(self):
+        """Resets the simulation but doesn't close AIMSUN."""
+        # inform the simulation that it should cancel the simulation and the
+        # server connection
+        self._send_command(ac.SIMULATION_RESET, in_format=None, values=None, out_format=None)
+
+        # reconnect to the server
+        self.s = create_client(self.port)
 
     def get_edge_name(self, edge):
         """Get the name of an edge in Aimsun.
@@ -650,3 +661,350 @@ class FlowAimsunAPI(object):
                            in_format='i',
                            values=(veh_id,),
                            out_format=None)
+
+    def get_intersection_offset(self, node_id):
+        """
+        Gets the intersection's offset
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+
+        Returns
+        -------
+        int
+            the offset of the intersection
+        """
+        offset, = self._send_command(ac.INT_GET_OFFSET,
+                                     in_format='i',
+                                     values=(node_id,),
+                                     out_format='i')
+
+        return offset
+
+    def change_intersection_offset(self, node_id, offset):
+        """
+        Changes an intersection's offset by the above offset
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+        offset : float
+            the offset of the intersection
+
+        Returns
+        -------
+        list
+            list of current phases as ints
+        """
+        self._send_command(ac.INT_CHANGE_OFFSET,
+                           in_format='i f',
+                           values=(node_id, offset,),
+                           out_format=None)
+
+
+    def get_replication_name(self, node_id): #cj28
+        """
+        Gets the intersection's offset
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+
+        Returns
+        -------
+        int
+            the offset of the intersection
+        """
+        rep_name,rep_seed, = self._send_command(ac.INT_GET_REPLICATION_NAME,
+                                     in_format='i',
+                                     values=(node_id,),
+                                     out_format='i i')
+
+        return rep_name, rep_seed
+
+    def get_duration_phase(self, node_id, phase):  # cj
+        """
+        Get control id and num_rings
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+        phase: int
+            phase index
+
+        Returns
+        -------
+        int (3)
+            normalDuration, minDuration, maxDuration
+        """
+        normalDuration, maxDuration, minDuration, = self._send_command(ac.INT_GET_DURATION_PHASE,
+                                                                       in_format='i i',
+                                                                       values=(node_id, phase,),
+                                                                       out_format='f f f')
+
+        return normalDuration, maxDuration, minDuration
+
+    def get_control_ids(self, node_id):  # cj
+        """
+        Get control id and num_rings
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+
+        Returns
+        -------
+        int (2)
+            control_id, num_rings
+        """
+        control_id, num_rings, = self._send_command(ac.INT_GET_CONTROL_IDS,
+                                                    in_format='i',
+                                                    values=(node_id,),
+                                                    out_format='i i')
+
+        return control_id, num_rings
+
+    def get_green_phases(self, node_id, ring_id):
+        """
+        Gets the intersection's total green time per ring
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+        ring_id : int
+            the ring id of the control plan
+
+        Returns
+        -------
+        int / list
+            green phases
+        """
+        green_phases = self._send_command(ac.INT_GET_GREEN_PHASES,
+                                          in_format='i i',
+                                          values=(node_id, ring_id,),
+                                          out_format='str')
+
+        return [int(green_phase) for green_phase in green_phases.split(',')]
+
+    def get_cycle_length(self, node_id, control_id):  # cj
+        """
+        Gets the intersection's total green time per ring
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+
+        Returns
+        -------
+        int
+            the total green time of the intersection
+        """
+        control_cycle, = self._send_command(ac.INT_GET_CYCLE_LENGTH,
+                                          in_format='i i',
+                                          values=(node_id, control_id,),
+                                          out_format='f')
+
+        return control_cycle
+
+    def change_phase_duration(self, node_id, phase, duration, maxout):
+        """
+        Changes the phase timing
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+        duration : float
+            the new duration of the phases
+
+        Returns
+        -------
+        int
+            change of phase timing
+        """
+        self._send_command(ac.INT_CHANGE_PHASE_DURATION,
+                           in_format='i i f f',
+                           values=(node_id, phase, duration,maxout,),
+                           out_format=None)
+
+    def get_detector_lanes(self, edge_id): #cj
+        """
+        Gets the detector ids on an edge
+
+        Parameters
+        ----------
+        edge_id : int
+            the id of the edge
+
+        Returns
+        -------
+        dict
+            dict of detector ids with keys 'stopbar' and 'advanced'
+        """
+        output = self._send_command(ac.DET_GET_DETECTOR_LANES,
+                                    in_format='i',
+                                    values=(edge_id,),
+                                    out_format='str')
+        return json.loads(output)
+
+    def get_incoming_edges(self, node_id):
+        """
+        Gets an intersection's incoming edges
+
+        Parameters
+        ----------
+        node_id : int
+            the node id of the intersection
+
+        Returns
+        -------
+        list
+            list of edge ids as ints
+        """
+        edge_ids = self._send_command(ac.INT_GET_IN_EDGES,
+                                      in_format='i',
+                                      values=(node_id,),
+                                      out_format='str')
+
+        return [int(edge_id) for edge_id in edge_ids.split(',')]
+
+    def get_cumulative_queue_length(self, section_id):
+        """
+        Gets a section's cumulative queue length
+
+        Parameters
+        ----------
+        section_id : int
+            the id of the section
+
+        Returns
+        -------
+        float
+            the cumulative queue length
+        """
+        cume_queue_length, = self._send_command(ac.INT_GET_CUME_QUEUE_LENGTH,
+                                                in_format='i',
+                                                values=(section_id,),
+                                                out_format='f')
+
+        return cume_queue_length
+
+    def get_detectors_on_edge(self, edge_id):
+        """
+        Gets the detector ids on an edge
+
+        Parameters
+        ----------
+        edge_id : int
+            the id of the edge
+
+        Returns
+        -------
+        dict
+            dict of detector ids with keys 'stopbar' and 'advanced'
+        """
+        output = self._send_command(ac.DET_GET_IDS_ON_EDGE,
+                                    in_format='i',
+                                    values=(edge_id,),
+                                    out_format='str')
+        return json.loads(output)
+
+    def get_detector_count_and_occupancy(self, detector_id):
+        """
+        Gets the detector's flow count and occupancy values
+
+        Parameters
+        ----------
+        detector_id : int
+            the id of the detector
+
+        Returns
+        -------
+        int, float
+            flow and occupancy of the detector
+        """
+        flow, occupancy = self._send_command(ac.DET_GET_COUNT_AND_OCCUPANCY,
+                                             in_format='i',
+                                             values=(detector_id,),
+                                             out_format='i f')
+        return flow, occupancy
+
+    def set_statistical_interval(self, hour, minute, sec):
+        """
+        Sets the statistical interval for the scenario
+
+        Parameters
+        ----------
+        hour : int
+            interval in hours
+        minute : int
+            interval in minutes
+        sec : int
+            interval in seconds
+        """
+        self._send_command(ac.DET_SET_STAT_INTERVAL,
+                           in_format='i i i',
+                           values=(hour, minute, sec,),
+                           out_format=None)
+
+    def set_detection_interval(self, hour, minute, sec):
+        """
+        Sets the detection interval for the scenario
+
+        Parameters
+        ----------
+        hour : int
+            interval in hours
+        minute : int
+            interval in minutes
+        sec : int
+            interval in seconds
+        """
+        self._send_command(ac.DET_SET_DETECTION_INTERVAL,
+                           in_format='i i i',
+                           values=(hour, minute, sec,),
+                           out_format=None)
+
+    def set_replication_seed(self, seed):
+        """
+        Sets the replication seed
+
+        Parameters
+        ----------
+        seed : int
+            random seed
+        """
+
+        self._send_command(ac.REPL_SET_SEED,
+                           in_format='i',
+                           values=(seed,),
+                           out_format=None)
+
+    def get_green_util(self, node_id): #gutil
+        """
+        Gets the occurence and total time of each phase in a node
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        list
+            Green Time Utilization per node
+        """
+        gUtil_list = self._send_command(ac.INT_GET_GREEN_UTIL,
+                                    in_format='i',
+                                    values=(node_id,),        
+                                    out_format='str')
+        #return g_Util
+        return [float(g_Util) for g_Util in gUtil_list.split(',')]
+
