@@ -1,6 +1,6 @@
 import csv
 import sys
-sys.path.append('/home/cjrsantos/anaconda3/envs/aimsun_flow/lib/python2.7/site-packages')
+sys.path.append('/home/damian/anaconda3/envs/aimsun_flow/lib/python2.7/site-packages')
 import numpy as np
 import pandas as pd
 import json

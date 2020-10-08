@@ -66,7 +66,7 @@ class MultiLightEnv(Env):
         self.edge_detector_dict = {}
         self.edges_with_detectors = {}
         self.past_cumul_queue = {}
-        self.current_phase_timings = []
+        self.current_phase_timings = np.zeros(int(len(self.target_nodes)))
         #ap_keys = dict.fromkeys(['control_id', 'num_rings', 'green_phases', 'cc_dict', 'sum_interphase', 'max_dict', 'max_p'])
         #self.aimsun_props = {dict.fromkeys(self.target_nodes, ap_keys)}
         self.aimsun_props = {}
