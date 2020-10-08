@@ -75,7 +75,7 @@ def setup_exps(version=0):
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config["num_workers"] = RLLIB_N_CPUS
-    config["sgd_minibatch_size"] = RLLIB_HORIZON  # 16
+    config["sgd_minibatch_size"] = 32 # 16
     config["train_batch_size"] = RLLIB_HORIZON * RLLIB_N_ROLLOUTS  # 16*3
     config["sample_batch_size"] = RLLIB_HORIZON * RLLIB_N_ROLLOUTS
     config["model"].update({"fcnet_hiddens": [64, 64, 64]})
@@ -86,9 +86,9 @@ def setup_exps(version=0):
     config['clip_actions'] = False  # (ev) temporary ray bug
     config["horizon"] = RLLIB_HORIZON  # not same as env horizon.
     config["vf_loss_coeff"] = 1
-    config["vf_clip_param"] = 100e3
+    config["gamma"] = 0.999
     # config["lr"] = 5e-4 #vary, lr
-    config["lr_schedule"] = [[0, 5e-3], [150000, 5e-4]]
+    config["lr_schedule"] = [[0, 5e-3], [120000, 5e-4]]
 
     # save the flow params for replay
     flow_json = json.dumps(
@@ -120,10 +120,10 @@ if __name__ == "__main__":
             "stop": {
                 "training_iteration": RLLIB_TRAINING_ITERATIONS,
             },
-            # "restore": '/home/damian/ray_results/single_light_queue/PPO_SingleLightEnv-v0_ab65bf70_2020-08-01_04-58-41d_bnsz2z/checkpoint_96/checkpoint-96',
+            "restore": '/home/damian/ray_results/multi_light_trial1/PPO_MultiLightEnv-v0_aa8aa4f8_2020-09-30_06-10-40u92vq2gv/checkpoint_1728/checkpoint-1728',
             # "local_dir": os.path.abspath("./ray_results"),
             "keep_checkpoints_num": 7,
             "checkpoint_score_attr": "episode_reward_mean"
         }
     },
-        resume=False)
+        resume=True)
