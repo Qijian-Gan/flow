@@ -251,7 +251,7 @@ class MultiLightEnv(MultiEnv):
             
             all_actions.append(rescaled_actions)
 
-        self.current_phase_timings = self.all_actions
+        self.current_phase_timings = all_actions
 
     def get_state(self, rl_id=None, **kwargs):
         """See class definition."""
@@ -354,18 +354,10 @@ class MultiLightEnv(MultiEnv):
                 self.env_params.horizon)  # or crash
 
         # compute the info for each agent
-        infos = {}
+        infos = {key: {} for key in states.keys()}
 
         # compute the reward
         reward = self.compute_reward(rl_actions)
-
-        #
-        #infos = {key: {} for key in states.keys()}
-#
-        #for node_id in self.target_nodes:
-        #    rl_id = str(node_id)
-        #    reward[rl_id] = 0
-        #    next_observation[rl_id] = np.zeros(self.observation_space)
 
         return next_observation, reward, done, infos
 
