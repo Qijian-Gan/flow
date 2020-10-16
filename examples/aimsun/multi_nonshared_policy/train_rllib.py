@@ -97,13 +97,13 @@ def n2_action():
 #    space = base_action(4) 
 #    return Tuple(*space)  # 5 (probabilities)
 
-POLICY_GRAPHS = {'n1': gen_policy(Tuple(7*[Discrete(100,)])),
-                 'n2': gen_policy(Tuple(9*[Discrete(100,)]))}
+POLICY_GRAPHS = {'3329': gen_policy(Tuple(7*[Discrete(100,)])),
+                 '3344': gen_policy(Tuple(9*[Discrete(100,)]))}
                  #'n3': gen_policy(n3_action),
                  #'n4': gen_policy(n4_action),
                  #'n5': gen_policy(n5_action)}
 
-POLICIES_TO_TRAIN = ['n1','n2']
+POLICIES_TO_TRAIN = ['3329','3344']
 
 def policy_mapping_fn(agent_id):
     """Map a policy in RLlib."""

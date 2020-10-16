@@ -25,7 +25,7 @@ RLLIB_N_ROLLOUTS = 3  # copy from train_rllib.py
 np.random.seed(1234567890)
 
 # read csv of Node Parameters
-ap = Aimsun_Params('/home/cjrsantos/flow/flow/utils/aimsun/aimsun_props.csv')
+ap = Aimsun_Params('/home/damian/flow/flow/utils/aimsun/aimsun_props.csv')
 
 def rescale_bar(array, NewMin, NewMax):
     rescaled_action = []
@@ -140,11 +140,11 @@ class MultiLightEnv(MultiEnv):
             #print('self.ignore_policy is True')
             return
 
-        self.all_actions = []
+        all_actions = []
 
         #define different actions for different multiagents
-        n1_actions = rl_actions['n1']
-        n2_actions = rl_actions['n2']
+        n1_actions = rl_actions['3329']
+        n2_actions = rl_actions['3344']
         #n3_action = rl_actions['n3']
         #n4_action = rl_actions['n4']
         #n5_action = rl_actions['n5']
@@ -173,14 +173,15 @@ class MultiLightEnv(MultiEnv):
                 sum_barrier = [round(cycle*barrier), cycle - round(cycle*barrier)]
                 action_rings = [[actions[0:2],actions[2:4]],[[[]],actions[4:6]]]
                 for i in range(len(action_rings)): #2
-                    ring = actions_rings[i] #i=0, ring = [[],[]], i =1, ring = [x,[]]
+                    ring = action_rings[i] #i=0, ring = [[],[]], i =1, ring = [x,[]]
                     #print(i, ring)
                     for j in range(len(ring)):
                         phase_pair = ring[j]
-                        actions_rings[i][j] = rescale_act(phase_pair, sum_barrier[j], sum(phase_pair))
+                        if phase_pair != []:
+                            action_rings[i][j] = rescale_act(phase_pair, sum_barrier[j], sum(phase_pair))
 
                 # for phase 9, p9 = sum(ring1,barrier1) + 1st interphase
-                actions_rings[1][0] = [sum(actions_rings[0][0]) + 4] # 4 is interphase between 1 and 3
+                action_rings[1][0] = [sum(action_rings[0][0]) + 4] # 4 is interphase between 1 and 3
                 action_rings[1][1][0] -= 1 #interphase is greater than ring1b2 by 1sec
 
             elif node_id == 3344:
@@ -247,7 +248,7 @@ class MultiLightEnv(MultiEnv):
                         maxout = maxd
                     self.k.traffic_light.change_phase_duration(self.node_id, phase, action, maxd)
             
-            self.all_actions.append(rescaled_actions)
+            all_actions.append(rescaled_actions)
 
         self.current_phase_timings = self.all_actions
 
@@ -269,13 +270,13 @@ class MultiLightEnv(MultiEnv):
             for j, (edge_id, detector_info) in enumerate(edge.items()):
                 for k, (detector_type, detector_ids) in enumerate(detector_info.items()):
                     if detector_type == 'through':
-                        index = (i, j, 0)
+                        index = (j, 0)
                     elif detector_type == 'right':
-                        index = (i, j, 1)
+                        index = (j, 1)
                     elif detector_type == 'left':
-                        index = (i, j, 2)
+                        index = (j, 2)
                     elif detector_type == 'advanced':
-                        index = (i, j, 3)
+                        index = (j, 3)
 
                     flow, occup = 0, []
                     for detector in detector_ids:
@@ -289,7 +290,7 @@ class MultiLightEnv(MultiEnv):
                         det_state[(*index, 1)] = 0
 
             state = det_state.flatten()
-            ma_state[node] = state
+            ma_state[str(node)] = state
 
         return ma_state
 
@@ -314,9 +315,9 @@ class MultiLightEnv(MultiEnv):
             new_reward = ((a0*r_queue) + (a1*gUtil))
 
             reward -= (new_reward ** 2) * 100
-            ma_reward[node_id] = reward
+            ma_reward[str(node_id)] = reward
 
-        print(f'{self.k.simulation.time:.0f}', '\t', f'{ma_reward}', '\t', f'{self.all_actions}')
+        print(f'{self.k.simulation.time:.0f}', '\t', f'{ma_reward}', '\t', f'{self.current_phase_timings}')
 
         return ma_reward
 

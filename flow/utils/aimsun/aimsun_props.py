@@ -82,6 +82,9 @@ class Export_Params:
             csv_writer = csv.writer(csvFile)
             csv_writer.writerows([data_list,])
 
+    def export_actions(self, node_id):
+        pass
+
 ##test
 #print(get_green_phases(3344))
 #print('********************')

@@ -10,6 +10,7 @@ import os
 import math
 import flow.utils.aimsun.constants as ac
 import flow.config as config
+#from flow.multi_light impoty additional_env_params
 
 sys.path.append(os.path.join(config.AIMSUN_NEXT_PATH,
                              'programming/Aimsun Next API/AAPIPython/Micro'))
@@ -27,7 +28,7 @@ PORT = int(model.getAuthor())
 entered_vehicles = []
 exited_vehicles = []
 
-target_nodes = [3329, 3344, 3370, 3341, 3369]
+target_nodes = [3329, 3344] 
 start_time = [0]*2
 ut_time = [0]*2
 green_phases = {}
