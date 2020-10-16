@@ -142,16 +142,16 @@ class MultiLightEnv(MultiEnv):
 
         all_actions = []
 
-        #define different actions for different multiagents
-        n1_actions = rl_actions['3329']
-        n2_actions = rl_actions['3344']
-        #n3_action = rl_actions['n3']
-        #n4_action = rl_actions['n4']
-        #n5_action = rl_actions['n5']
+        for node_id, rl_action in rl_actions.items():
+            #define different actions for different multiagents
+            #n1_actions = rl_action['3329']
+            #n2_actions = rl_action['3344']
+            #n3_action = rl_actions['n3']
+            #n4_action = rl_actions['n4']
+            #n5_action = rl_actions['n5']
       
-        self.rep_name, _ = self.k.traffic_light.get_replication_name(3344)
+            self.rep_name, _ = self.k.traffic_light.get_replication_name(3344)
 
-        for node_id in self.target_nodes:
             control_id, num_rings = self.k.traffic_light.get_control_ids(node_id)  # self.control_id = list, num_rings = list
             max_dict, max_p = ap.get_max_dict(node_id, self.rep_name)
 
@@ -166,12 +166,12 @@ class MultiLightEnv(MultiEnv):
             cur_maxdl = max_p[control_id]
             maxd_list = max_dict[cur_maxdl]
 
-            if node_id == 3329:
-                def_actions = np.array(n1_actions).flatten()
+            if node_id == str(3329):
+                def_actions = np.array(rl_action).flatten()
                 actions = rescale_bar(def_actions,10,90)
                 barrier = actions[-1]/100
                 sum_barrier = [round(cycle*barrier), cycle - round(cycle*barrier)]
-                action_rings = [[actions[0:2],actions[2:4]],[[[]],actions[4:6]]]
+                action_rings = [[actions[0:2],actions[2:4]],[[],actions[4:6]]]
                 for i in range(len(action_rings)): #2
                     ring = action_rings[i] #i=0, ring = [[],[]], i =1, ring = [x,[]]
                     #print(i, ring)
@@ -184,8 +184,8 @@ class MultiLightEnv(MultiEnv):
                 action_rings[1][0] = [sum(action_rings[0][0]) + 4] # 4 is interphase between 1 and 3
                 action_rings[1][1][0] -= 1 #interphase is greater than ring1b2 by 1sec
 
-            elif node_id == 3344:
-                def_actions = np.array(n1_actions).flatten()
+            elif node_id == str(3344):
+                def_actions = np.array(rl_action).flatten()
                 actions = rescale_bar(def_actions,10,90)
                 barrier = actions[-1]/100
                 sum_barrier = [round(cycle*barrier), cycle - round(cycle*barrier)]
@@ -239,14 +239,13 @@ class MultiLightEnv(MultiEnv):
             
 
             rescaled_actions = [phase for ring in action_rings for pair in ring for phase in pair]
-            phase_list = self.observed_phases
-            for phase, action, maxd in zip(phase_list, rescaled_actions, self.maxd_list):
+            for phase, action, maxd in zip(phase_list, rescaled_actions, maxd_list):
                 if action:
                     if action > maxd:
                         maxout = action
                     else:
                         maxout = maxd
-                    self.k.traffic_light.change_phase_duration(self.node_id, phase, action, maxd)
+                    self.k.traffic_light.change_phase_duration(node_id, phase, action, maxd)
             
             all_actions.append(rescaled_actions)
 
@@ -263,7 +262,7 @@ class MultiLightEnv(MultiEnv):
         num_measures = (ap['num_measures'])
         normal = 2000
 
-        ma_state = {}
+        obs = {}
         shape = (num_edges, num_detectors_types, num_measures)
         for i, (node, edge) in enumerate(self.edge_detector_dict.items()):
             det_state = np.zeros(shape)
@@ -290,16 +289,17 @@ class MultiLightEnv(MultiEnv):
                         det_state[(*index, 1)] = 0
 
             state = det_state.flatten()
-            ma_state[str(node)] = state
+            obs.update({str(node): state})
+            #ma_state[str(node)] = state
 
-        return ma_state
+        return obs
 
     def compute_reward(self, rl_actions, **kwargs):
         """Computes the sum of queue lengths at all intersections in the network."""
         # change to queue + util per node
         reward = 0
         node_gUtil = self.k.traffic_light.get_green_util(3322)
-        ma_reward = {}
+        rews = {}
         for i, node_id in enumerate(self.target_nodes):
             r_queue = 0
             gUtil = node_gUtil[i]
@@ -315,11 +315,11 @@ class MultiLightEnv(MultiEnv):
             new_reward = ((a0*r_queue) + (a1*gUtil))
 
             reward -= (new_reward ** 2) * 100
-            ma_reward[str(node_id)] = reward
+            rews[str(node_id)] = reward
 
         print(f'{self.k.simulation.time:.0f}', '\t', f'{ma_reward}', '\t', f'{self.current_phase_timings}')
 
-        return ma_reward
+        return rews
 
     def step(self, rl_actions):
         """See parent class."""

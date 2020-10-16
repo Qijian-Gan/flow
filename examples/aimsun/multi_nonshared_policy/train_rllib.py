@@ -155,7 +155,7 @@ def setup_exps(version=0):
             {'policy_mapping_fn': tune.function(policy_mapping_fn)})
     config['multiagent'].update({'policies_to_train': POLICIES_TO_TRAIN})
 
-    create_env, gym_name = make_create_env(params=flow_params)
+    #create_env, gym_name = make_create_env(params=flow_params)
 
     return alg_run, gym_name, config
 
