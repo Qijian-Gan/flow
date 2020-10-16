@@ -142,14 +142,16 @@ class MultiLightEnv(MultiEnv):
 
         all_actions = []
 
-        for node_id, rl_action in rl_actions.items():
+        for rl_id, rl_action in rl_actions.items():
             #define different actions for different multiagents
             #n1_actions = rl_action['3329']
             #n2_actions = rl_action['3344']
             #n3_action = rl_actions['n3']
             #n4_action = rl_actions['n4']
             #n5_action = rl_actions['n5']
-      
+            print(rl_id, rl_action)
+
+            node_id = int(rl_id)
             self.rep_name, _ = self.k.traffic_light.get_replication_name(3344)
 
             control_id, num_rings = self.k.traffic_light.get_control_ids(node_id)  # self.control_id = list, num_rings = list
@@ -317,7 +319,7 @@ class MultiLightEnv(MultiEnv):
             reward -= (new_reward ** 2) * 100
             rews[str(node_id)] = reward
 
-        print(f'{self.k.simulation.time:.0f}', '\t', f'{ma_reward}', '\t', f'{self.current_phase_timings}')
+        print(f'{self.k.simulation.time:.0f}', '\t', f'{rews}', '\t', f'{self.current_phase_timings}')
 
         return rews
 
