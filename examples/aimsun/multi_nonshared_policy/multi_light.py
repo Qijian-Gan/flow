@@ -168,7 +168,7 @@ class MultiLightEnv(MultiEnv):
             cur_maxdl = max_p[control_id]
             maxd_list = max_dict[cur_maxdl]
 
-            if node_id == str(3329):
+            if node_id == 3329:
                 def_actions = np.array(rl_action).flatten()
                 actions = rescale_bar(def_actions,10,90)
                 barrier = actions[-1]/100
@@ -186,7 +186,7 @@ class MultiLightEnv(MultiEnv):
                 action_rings[1][0] = [sum(action_rings[0][0]) + 4] # 4 is interphase between 1 and 3
                 action_rings[1][1][0] -= 1 #interphase is greater than ring1b2 by 1sec
 
-            elif node_id == str(3344):
+            elif node_id == 3344:
                 def_actions = np.array(rl_action).flatten()
                 actions = rescale_bar(def_actions,10,90)
                 barrier = actions[-1]/100
@@ -294,6 +294,7 @@ class MultiLightEnv(MultiEnv):
             obs.update({str(node): state})
             #ma_state[str(node)] = state
 
+        print(obs)
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -348,6 +349,7 @@ class MultiLightEnv(MultiEnv):
 
         # test if the environment should terminate due to a collision or the
         # time horizon being met
+        
         done = (self.time_counter >= self.env_params.warmup_steps +
                 self.env_params.horizon)  # or crash
 
@@ -356,6 +358,14 @@ class MultiLightEnv(MultiEnv):
 
         # compute the reward
         reward = self.compute_reward(rl_actions)
+
+        #
+        #infos = {key: {} for key in states.keys()}
+#
+        #for node_id in self.target_nodes:
+        #    rl_id = str(node_id)
+        #    reward[rl_id] = 0
+        #    next_observation[rl_id] = np.zeros(self.observation_space)
 
         return next_observation, reward, done, infos
 
